@@ -1,11 +1,11 @@
+use fastanvil::Region;
+use serde::{Deserialize};
 use std::collections::HashMap;
 use std::fs::File;
-use std::str::FromStr;
-use fastanvil::Region;
-use serde::{Deserialize, Deserializer};
 
 #[derive(Deserialize)]
 pub struct PositionData {
+    pub blockstates: HashMap<i32, BlockState>,
     pub biome_name: String,
     pub top_y: i32,
 }
@@ -13,41 +13,20 @@ pub struct PositionData {
 #[derive(Deserialize)]
 pub struct Chunk {
     pub pos: i64,
-    #[serde(flatten, deserialize_with = "deserialize_sections")]
-    pub sections: HashMap<(i32, i32), PositionData>
+    #[serde(flatten)]
+    pub sections: HashMap<String, PositionData>
 }
 
-fn deserialize_sections<'de, D>(
-    deserializer: D,
-) -> Result<HashMap<(i32, i32), PositionData>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    // Temporary HashMap<String, PositionData>
-    let raw_map = HashMap::<String, PositionData>::deserialize(deserializer)?;
-
-    // New HashMap<(i32, i32), PositionData>
-    let mut map = HashMap::new();
-
-    for (key, value) in raw_map {
-        // キーを解析して(i32, i32)に変換
-        let mut parts = key.split(',');
-        if let (Some(part1), Some(part2)) = (parts.next(), parts.next()) {
-            let x = i32::from_str(part1).map_err(serde::de::Error::custom)?;
-            let y = i32::from_str(part2).map_err(serde::de::Error::custom)?;
-            map.insert((x, y), value);
-        } else {
-            return Err(serde::de::Error::custom("Invalid key format"));
-        }
-    }
-
-    Ok(map)
+#[derive(Deserialize)]
+pub struct BlockState {
+    pub name: String,
+    pub properties: HashMap<String, String>
 }
 
 
 pub struct JourneyMapReader<> {
     origin: String,
-    region: Option<Region<File>>
+    region: Option<Region<File>>,
 }
 
 impl JourneyMapReader {
@@ -66,15 +45,12 @@ impl JourneyMapReader {
     }
 
     pub fn get_chunk(&mut self, x: usize, z: usize) -> Result<Option<Chunk>, Box<dyn std::error::Error>> {
-        if self.region.is_none() {
-            return Err("Region not loaded".into())
-        }
-        let region = self.region.as_mut().unwrap();
-        let chunk = region.read_chunk(x, z)?;
-        if chunk.is_none() {
-            return Ok(None)
-        }
-        let parsed: fastnbt::error::Result<Chunk> = fastnbt::from_bytes(chunk.unwrap().as_slice());
+
+        let region = self.region.as_mut().ok_or("Region not loaded")?;
+        let chunk = region.read_chunk(x, z)?.ok_or("Chunk not found")?;
+
+        // let parsed: fastnbt::error::Result<Chunk> = fastnbt::from_bytes(chunk.unwrap().as_slice());
+        let parsed: fastnbt::error::Result<Chunk> = fastnbt::from_bytes(&chunk);
         match parsed {
             Ok(chunk) => Ok(Some(chunk)),
             Err(e) => Err(e.into())
@@ -93,14 +69,5 @@ impl JourneyMapReader {
 
     pub fn positive_modulo(x: i32, m: i32) -> i32 {
         (x % m + m) % m
-    }
-}
-
-impl Chunk {
-    pub fn get_all_sorted(&self) -> Vec<(&(i32, i32), &PositionData)> {
-        // sort by x, then y
-        let mut vec: Vec<_> = self.sections.iter().collect();
-        vec.sort_by(|a, b| a.0.0.cmp(&b.0.0).then(a.0.1.cmp(&b.0.1)));
-        vec
     }
 }
