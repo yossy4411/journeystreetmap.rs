@@ -1,7 +1,9 @@
 use fastanvil::Region;
-use serde::{Deserialize};
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
+
+pub mod biome;
 
 #[derive(Deserialize)]
 pub struct PositionData {

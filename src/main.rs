@@ -3,8 +3,9 @@ use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window, WindowAttributes, WindowId};
-use journeystreetmap_rs::{biome, journeymap};
-use journeystreetmap_rs::biome::RGB;
+use journeystreetmap_rs::journeymap;
+use journeystreetmap_rs::journeymap::biome::RGB;
+use journeystreetmap_rs::journeymap::biome;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let event_loop = winit::event_loop::EventLoop::new();
