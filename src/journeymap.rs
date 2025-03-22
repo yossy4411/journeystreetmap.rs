@@ -5,7 +5,7 @@ use std::fs::File;
 
 #[derive(Deserialize)]
 pub struct PositionData {
-    pub blockstates: HashMap<i32, BlockState>,
+    pub blockstates: HashMap<String, BlockState>,
     pub biome_name: String,
     pub top_y: i32,
 }
@@ -19,8 +19,10 @@ pub struct Chunk {
 
 #[derive(Deserialize)]
 pub struct BlockState {
+    #[serde(rename = "Name")]
     pub name: String,
-    pub properties: HashMap<String, String>
+    #[serde(rename = "Properties")]
+    pub properties: Option<HashMap<String, String>>
 }
 
 
