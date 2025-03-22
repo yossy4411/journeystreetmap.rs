@@ -93,9 +93,6 @@ impl Application {
                         continue;
                     }
                     let chunk = chunk.unwrap();
-                    // println!("Chunk pos: {}", chunk.pos);
-
-                    // MinecraftのXZ座標をピクセル座標に変換
                     for (pos, data) in chunk.sections {
                         let mut splited = pos.split(',');
                         let x: i32 = splited.next().unwrap().parse().unwrap();
@@ -105,19 +102,19 @@ impl Application {
                         let block_x = x - 512 * region_x;
                         let block_z = z - 512 * region_z;
 
-                        // ここが重要！Z座標を反転させて、X-Z平面を正しく表示！
+                        // Z座標を反転させ、X-Z平面にマッピング
                         let pixel_x = block_x;
-                        let pixel_y = block_z;  // 👈 ここ！Z座標を反転
+                        let pixel_y = block_z;
 
                         // RGBA配列のインデックスを計算
                         let i = (pixel_y * image_width as i32 + pixel_x) as usize;
 
                         // 範囲チェック
-                        if i + 3 < image_data.len() {
+                        if i < image_data.len() {
                             let color = biome::get_color(&data.biome_name);
                             image_data[i] = color;
 
-                            // デバッグ用：グリッド線を引く（16ブロックごと）
+                            // Grid
                             image_data[i] =
                                 if block_x % 16 == 0 || block_z % 16 == 0 {
                                     color.blend(&RGB::new(255, 255, 255), 0.8)
