@@ -7,3 +7,5 @@ edition = "2024"
 serde = { version = "1.0.219", features = ["derive"] }
 fastanvil = "0.31.0"
 fastnbt = "2.5.0"
+[lib]
+path = "src/lib.rs"
