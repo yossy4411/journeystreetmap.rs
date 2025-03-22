@@ -11,8 +11,9 @@ winit = "0.30"
 pixels = "0.15.0"
 
 [lib]
+name = "journeystreetmap"
 path = "src/lib.rs"
 
 [[bin]]
-name = "journeystreetmap"
+name = "journeystreetmap-editor"
 path = "src/main.rs"
