@@ -118,9 +118,12 @@ impl Application {
                             image_data[i] = color;
 
                             // デバッグ用：グリッド線を引く（16ブロックごと）
-                            if block_x % 16 == 0 || block_z % 16 == 0 {
-                                image_data[i] = RGB::new(255, 255, 255);
-                            }
+                            image_data[i] =
+                                if block_x % 16 == 0 || block_z % 16 == 0 {
+                                    color.blend(&RGB::new(255, 255, 255), 0.8)
+                                } else {
+                                    color
+                                };
                         }
                     }
                 } else {
