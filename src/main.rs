@@ -133,15 +133,15 @@ impl ApplicationHandler for Application<'_> {
 impl Application<'_> {
     fn load_images(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut reader = journeymap::JourneyMapReader::new("/home/okayu/.local/share/ModrinthApp/profiles/Fabulously Optimized/journeymap/data/mp/160~251~235~246/");
-        let region_offset_x = -1;
-        let region_offset_z = -1;
+        let region_offset_x = 0;
+        let region_offset_z = 0;
 
         let stopwatch = std::time::Instant::now();
 
         let mut threads = Vec::new();
 
-        for region_x in 0..=3 {
-            for region_z in 0..=3 {
+        for region_x in -1..=3 {
+            for region_z in -1..=3 {
                 let mut region = reader.try_read_region(region_offset_x + region_x, region_offset_z + region_z);
                 if region.is_none() {
                     println!("Region not found");
@@ -219,34 +219,39 @@ impl Application<'_> {
         // 映る範囲を計算
         let left = self.image_state.offset_x as i32;
         let top = self.image_state.offset_y as i32;
-        let region_x = (left as f32 / 512.0).floor() as i32;
-        let region_z = (top as f32 / 512.0).floor() as i32;
-        let key = format!("r.{}.{}", region_x, region_z);
-        if self.images.contains_key(&key) {
-            let image_data = self.images.get(&key).unwrap();
-
-            let block_offset_x = left % 512;
-            let block_offset_y = top % 512;
-            for x in block_offset_x..512 {
-                for y in block_offset_y..512 {
-                    if x < 0 || x >= 512 || y < 0 || y >= 512 {
-                        continue;
+        let region_left_x = (left as f32 / 512.0).floor() as i32;
+        let region_left_z = (top as f32 / 512.0).floor() as i32;
+        for rx in 0..=2 {
+            for rz in 0..=2 {
+                let region_x = region_left_x + rx;
+                let region_z = region_left_z + rz;
+                let key = format!("r.{}.{}", region_x, region_z);
+                if !self.images.contains_key(&key) {
+                    continue;
+                }
+                let image_data = self.images.get(&key).unwrap();
+                for x in 0..512 {
+                    for y in 0..512 {
+                        if x < 0 || x >= 512 || y < 0 || y >= 512 {
+                            continue;
+                        }
+                        let ori_idx = (y * 512 + x) as usize;  // もとの画像データのインデックス
+                        let color = image_data[ori_idx];
+                        let dest_x = x + rx * 512 - (left % 512);
+                        let dest_y = y + rz * 512 - (top % 512);
+                        if dest_x < 0 || dest_x >= self.image_width as i32 || dest_y < 0 || dest_y >= self.image_height as i32 {
+                            continue;
+                        }
+                        let dest_idx = (dest_y * self.image_width as i32 + dest_x) as usize;  // 表示する画像データのインデックス
+                        frame[dest_idx * 4] = color.r;
+                        frame[dest_idx * 4 + 1] = color.g;
+                        frame[dest_idx * 4 + 2] = color.b;
+                        frame[dest_idx * 4 + 3] = 255;
                     }
-                    let ori_idx = (y * 512 + x) as usize;  // もとの画像データのインデックス
-                    let color = image_data[ori_idx];
-                    let dest_x = x - block_offset_x;
-                    let dest_y = y - block_offset_y;
-                    if dest_x < 0 || dest_x >= self.image_width as i32 || dest_y < 0 || dest_y >= self.image_height as i32 {
-                        continue;
-                    }
-                    let dest_idx = (dest_y * self.image_width as i32 + dest_x) as usize;  // 表示する画像データのインデックス
-                    frame[dest_idx * 4] = color.r;
-                    frame[dest_idx * 4 + 1] = color.g;
-                    frame[dest_idx * 4 + 2] = color.b;
-                    frame[dest_idx * 4 + 3] = 255;
                 }
             }
         }
+
 
         binding.render()?;
         Ok(())
