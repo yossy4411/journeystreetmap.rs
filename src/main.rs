@@ -1,12 +1,12 @@
+use fastanvil::Region;
 use journeystreetmap::journeymap;
-use journeystreetmap::journeymap::{biome, JourneyMapReader};
 use journeystreetmap::journeymap::biome::RGB;
+use journeystreetmap::journeymap::{biome, JourneyMapReader};
 use pixels::{Pixels, SurfaceTexture};
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::File;
-use std::rc::Rc;
-use fastanvil::Region;
+use std::sync::{Arc, Mutex};
+use std::thread::JoinHandle;
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 // 画像の状態を管理する構造体
 struct ImageState {
-    zoom: u32,
+    zoom: f32,
     offset_x: f32,
     offset_y: f32,
     dragging: bool,
@@ -35,7 +35,7 @@ struct ImageState {
 impl ImageState {
     fn new() -> Self {
         Self {
-            zoom: 1,
+            zoom: 1.0,
             offset_x: 0.0,
             offset_y: 0.0,
             dragging: false,
@@ -52,16 +52,16 @@ impl Default for ImageState {
 }
 
 
-#[derive(Default)]
-struct Application<'a> {
+struct Application {
     image_state: ImageState,
     images: HashMap<String, Vec<RGB>>,  // Regionごとの画像データをキャッシュするためのHashMap
-    pixels: Option<Rc<RefCell<Pixels<'a>>>>, // 'staticにするとなんかへんかなって思ったからとりまApplicationと同じライフタイムにしてみた
+    pixels: Option<Arc<Mutex<Pixels<'static>>>>, // 'staticにするとなんかへんかなって思ったからとりまApplicationと同じライフタイムにしてみた
     image_width: u32,
     image_height: u32,
+    last_rendered: std::time::Instant,
 }
 
-impl Application<'_> {
+impl Application {
     fn new() -> Self {
         Self {
             image_state: ImageState::new(),
@@ -69,11 +69,12 @@ impl Application<'_> {
             pixels: None,
             image_width: 800,
             image_height: 800,
+            last_rendered: std::time::Instant::now(),
         }
     }
 }
 
-impl ApplicationHandler for Application<'_> {
+impl ApplicationHandler for Application {
     fn resumed(& mut self, event_loop: &ActiveEventLoop) {
         let window_attr = WindowAttributes::default()
             .with_inner_size(PhysicalSize::new(800,800))
@@ -83,15 +84,15 @@ impl ApplicationHandler for Application<'_> {
             .expect("Failed to create window");
 
         let window_size = window.inner_size();
-        let pixels = Rc::new(RefCell::new(Pixels::new(
+        let pixels = Pixels::new(
             self.image_width,
             self.image_height,
             SurfaceTexture::new(window_size.width, window_size.height, window),
-        ).expect("Pixels creation failed")));
+        ).expect("Pixels creation failed");
 
         self.load_images().expect("Failed to load images");
 
-        self.pixels = Some(pixels);
+        self.pixels = Some(Arc::new(Mutex::new(pixels)));
         self.render().expect("Failed to render");
 
     }
@@ -120,17 +121,38 @@ impl ApplicationHandler for Application<'_> {
                 if self.image_state.dragging {
                     self.image_state.offset_x -= dx;
                     self.image_state.offset_y -= dy;   // Y軸は上下逆
+                    // self.request_render();
                     self.render().expect("Failed to render");
                 }
                 self.image_state.last_mouse_x = position.x;
                 self.image_state.last_mouse_y = position.y;
             }
+            WindowEvent::RedrawRequested => {
+                self.render().expect("Failed to render");
+            }
+            WindowEvent::MouseWheel {
+                delta,
+                ..
+            } => {
+                match delta {
+                    winit::event::MouseScrollDelta::LineDelta(_x, y) => {
+                        if y > 0.0 {
+                            self.image_state.zoom = self.image_state.zoom * 1.1;
+                        } else {
+                            self.image_state.zoom = self.image_state.zoom / 1.1;
+                        }
+                        self.render().expect("Failed to render");
+                    }
+                    _ => {}
+                }
+            }
+
             _ => {}
         }
     }
 }
 
-impl Application<'_> {
+impl Application {
     fn load_images(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut reader = journeymap::JourneyMapReader::new("/home/okayu/.local/share/ModrinthApp/profiles/Fabulously Optimized/journeymap/data/mp/160~251~235~246/");
         let region_offset_x = 0;
@@ -210,50 +232,62 @@ impl Application<'_> {
     }
 
     fn render(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let mut binding = self.pixels.as_mut().ok_or("self.pixels is None")?.borrow_mut();
-        let frame = binding.frame_mut();
+        if self.pixels.is_some() && self.last_rendered.elapsed().as_millis() > 1000 / 30 {
+            self.last_rendered = std::time::Instant::now();
+        } else {
+            return Ok(());  // 30fpsになるように制御
+        }
+        {
+            let mut binding = self.pixels.as_ref().unwrap().lock().unwrap();
+            let frame = binding.frame_mut();
 
-        // フレームをクリア
-        frame.fill(0);
+            // フレームをクリア
+            frame.fill(0);
 
-        // 映る範囲を計算
-        let left = self.image_state.offset_x as i32;
-        let top = self.image_state.offset_y as i32;
-        let region_left_x = (left as f32 / 512.0).floor() as i32;
-        let region_left_z = (top as f32 / 512.0).floor() as i32;
-        for rx in 0..=2 {
-            for rz in 0..=2 {
-                let region_x = region_left_x + rx;
-                let region_z = region_left_z + rz;
-                let key = format!("r.{}.{}", region_x, region_z);
-                if !self.images.contains_key(&key) {
-                    continue;
-                }
-                let image_data = self.images.get(&key).unwrap();
-                for x in 0..512 {
-                    for y in 0..512 {
-                        if x < 0 || x >= 512 || y < 0 || y >= 512 {
-                            continue;
+            // 映る範囲を計算
+            let left = self.image_state.offset_x as i32;
+            let top = self.image_state.offset_y as i32;
+            let region_left_x = (left as f32 / 512.0).floor() as i32;
+            let region_left_z = (top as f32 / 512.0).floor() as i32;
+            let x_times = (512 + 800) as f32 / 512.0 / self.image_state.zoom;
+            let y_times = (512 + 800) as f32 / 512.0 / self.image_state.zoom;
+            for rx in 0..=x_times as i32 {
+                for rz in 0..=y_times as i32 {
+                    let region_x = region_left_x + rx;
+                    let region_z = region_left_z + rz;
+                    let key = format!("r.{}.{}", region_x, region_z);
+                    if !self.images.contains_key(&key) {
+                        continue;
+                    }
+                    let image_data = self.images.get(&key).unwrap();
+                    for x in 0..512 {
+                        for y in 0..512 {
+                            if x < 0 || x >= 512 || y < 0 || y >= 512 {
+                                continue;
+                            }
+                            let ori_idx = (y * 512 + x) as usize;  // もとの画像データのインデックス
+                            let color = image_data[ori_idx];
+                            let dest_x = x + rx * 512 - JourneyMapReader::positive_modulo(left, 512);
+                            let dest_y = y + rz * 512 - JourneyMapReader::positive_modulo(top, 512);
+                            let dest_x = (dest_x as f32 * self.image_state.zoom) as i32;
+                            let dest_y = (dest_y as f32 * self.image_state.zoom) as i32;
+                            if dest_x < 0 || dest_x >= self.image_width as i32 || dest_y < 0 || dest_y >= self.image_height as i32 {
+                                continue;
+                            }
+                            let dest_idx = (dest_y * self.image_width as i32 + dest_x) as usize;  // 表示する画像データのインデックス
+                            frame[dest_idx * 4] = color.r;
+                            frame[dest_idx * 4 + 1] = color.g;
+                            frame[dest_idx * 4 + 2] = color.b;
+                            frame[dest_idx * 4 + 3] = 255;
                         }
-                        let ori_idx = (y * 512 + x) as usize;  // もとの画像データのインデックス
-                        let color = image_data[ori_idx];
-                        let dest_x = x + rx * 512 - JourneyMapReader::positive_modulo(left, 512);
-                        let dest_y = y + rz * 512 - JourneyMapReader::positive_modulo(top, 512);
-                        if dest_x < 0 || dest_x >= self.image_width as i32 || dest_y < 0 || dest_y >= self.image_height as i32 {
-                            continue;
-                        }
-                        let dest_idx = (dest_y * self.image_width as i32 + dest_x) as usize;  // 表示する画像データのインデックス
-                        frame[dest_idx * 4] = color.r;
-                        frame[dest_idx * 4 + 1] = color.g;
-                        frame[dest_idx * 4 + 2] = color.b;
-                        frame[dest_idx * 4 + 3] = 255;
                     }
                 }
             }
+            binding.render().unwrap();
         }
 
 
-        binding.render()?;
+
         Ok(())
     }
 }
