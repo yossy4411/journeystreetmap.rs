@@ -18,15 +18,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 #[derive(Default)]
 struct Application {
-    window: Option<Window>
+    window: Option<Window>,
+    image_state: ImageState,
 }
 
 
 // 画像の状態を管理する構造体
 struct ImageState {
-    width: u32,
-    height: u32,
-    zoom: f32,
+    zoom: u32,
     offset_x: f32,
     offset_y: f32,
     dragging: bool,
@@ -35,17 +34,21 @@ struct ImageState {
 }
 
 impl ImageState {
-    fn new(width: u32, height: u32) -> Self {
+    fn new() -> Self {
         Self {
-            width,
-            height,
-            zoom: 1.0,
+            zoom: 1,
             offset_x: 0.0,
             offset_y: 0.0,
             dragging: false,
             last_mouse_x: 0.0,
             last_mouse_y: 0.0,
         }
+    }
+}
+
+impl Default for ImageState {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -67,6 +70,30 @@ impl ApplicationHandler for Application {
             WindowEvent::CloseRequested => {
                 event_loop.exit();
             }
+            WindowEvent::MouseInput {
+                state,
+                button,
+                ..
+            } => {
+                if button == winit::event::MouseButton::Left {
+                    self.image_state.dragging = state == winit::event::ElementState::Pressed;
+                }
+            }
+            WindowEvent::CursorMoved {
+                position,
+                ..
+            } => {
+                let position = position.to_logical::<f32>(1.0);
+                let dx = position.x - self.image_state.last_mouse_x;
+                let dy = position.y - self.image_state.last_mouse_y;
+                if self.image_state.dragging {
+                    self.image_state.offset_x += dx;
+                    self.image_state.offset_y -= dy;   // Y軸は上下逆
+                    self.render().expect("Failed to render");
+                }
+                self.image_state.last_mouse_x = position.x;
+                self.image_state.last_mouse_y = position.y;
+            }
             _ => {}
         }
     }
@@ -78,8 +105,8 @@ impl Application {
         let region_offset_x = -1;
         let region_offset_z = -1;
 
-        let image_width = 1024; // 1 chunk = 16 blocks, 32 chunks = 512 blocks (1 region)
-        let image_height = 1024;
+        let image_width = 800; // 1 chunk = 16 blocks, 32 chunks = 512 blocks (1 region)
+        let image_height = 800;
         let window_size = self.window.as_ref().ok_or("window not initialized")?.inner_size();
 
         let win = self.window.as_mut().ok_or("window not initialized")?;
@@ -88,8 +115,8 @@ impl Application {
         let stopwatch = std::time::Instant::now();
         let mut image_data = vec![RGB::default(); (image_width * image_height) as usize];
 
-        for region_x in 0..=1 {
-            for region_z in 0..=1 {
+        for region_x in 0..=0 {
+            for region_z in 0..=0 {
                 reader.read_region(region_offset_x + region_x, region_offset_z + region_z).expect("Failed to read region");
 
                 for i in 0..=31 {
@@ -110,14 +137,19 @@ impl Application {
                                 let block_x = x - 512 * region_offset_x;
                                 let block_z = z - 512 * region_offset_z;
 
-                                // Z座標を反転させ、X-Z平面にマッピング
-                                let pixel_x = block_x;
-                                let pixel_y = block_z;
+                                // X-Z平面にマッピング
+                                let pixel_x = block_x - self.image_state.offset_x as i32;
+                                let pixel_y = block_z - self.image_state.offset_y as i32;
+
+                                // ピクセル座標が画像内に収まらなかったらスキップ
+                                if pixel_x < 0 || pixel_x >= image_width as i32 || pixel_y < 0 || pixel_y >= image_height as i32 {
+                                    continue;
+                                }
 
                                 // RGBA配列のインデックスを計算
                                 let i = (pixel_y * image_width as i32 + pixel_x) as usize;
 
-                                // 範囲チェック
+                                // iが画像内に入るなら色を設定
                                 if i < image_data.len() {
                                     let color = biome::get_color(&data.biome_name);
                                     image_data[i] = color;
