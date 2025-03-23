@@ -1,15 +1,15 @@
-use std::cell::RefCell;
 use journeystreetmap::journeymap;
 use journeystreetmap::journeymap::biome;
 use journeystreetmap::journeymap::biome::RGB;
 use pixels::{Pixels, SurfaceTexture};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
-use winit::window::{Window, WindowAttributes, WindowId};
+use winit::window::{WindowAttributes, WindowId};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let event_loop = winit::event_loop::EventLoop::new();
@@ -54,7 +54,7 @@ impl Default for ImageState {
 struct Application<'a> {
     image_state: ImageState,
     images: HashMap<String, Vec<RGB>>,  // Regionごとの画像データをキャッシュするためのHashMap
-    pixels: Option<Rc<RefCell<Pixels<'a>>>>,
+    pixels: Option<Rc<RefCell<Pixels<'a>>>>, // 'staticにするとなんかへんかなって思ったからとりまApplicationと同じライフタイムにしてみた
     image_width: u32,
     image_height: u32,
 }
@@ -87,7 +87,7 @@ impl ApplicationHandler for Application<'_> {
             SurfaceTexture::new(window_size.width, window_size.height, window),
         ).expect("Pixels creation failed")));
 
-        self.load_images();
+        self.load_images().expect("Failed to load images");
 
         self.pixels = Some(pixels);
         self.render().expect("Failed to render");
@@ -129,16 +129,16 @@ impl ApplicationHandler for Application<'_> {
 }
 
 impl Application<'_> {
-    fn load_images(&mut self) {
+    fn load_images(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut reader = journeymap::JourneyMapReader::new("/home/okayu/.local/share/ModrinthApp/profiles/Fabulously Optimized/journeymap/data/mp/160~251~235~246/");
         let region_offset_x = -1;
         let region_offset_z = -1;
 
         let stopwatch = std::time::Instant::now();
 
-        for region_x in 0..=0 {
-            for region_z in 0..=0 {
-                reader.read_region(region_offset_x + region_x, region_offset_z + region_z).expect("Failed to read region");
+        for region_x in 0..=1 {
+            for region_z in 0..=1 {
+                reader.read_region(region_offset_x + region_x, region_offset_z + region_z)?;
                 let mut image_data = vec![RGB::default(); 512 * 512];
                 for i in 0..=31 {
                     for j in 0..=31 {
@@ -186,6 +186,7 @@ impl Application<'_> {
             }
         }
         println!("Time taken: {:?}", stopwatch.elapsed());
+        Ok(())
     }
 
     fn render(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -198,8 +199,8 @@ impl Application<'_> {
         // 映る範囲を計算
         let left = self.image_state.offset_x as i32;
         let top = self.image_state.offset_y as i32;
-        let region_x = left / 512;
-        let region_z = top / 512;
+        let region_x = (left as f32 / 512.0).floor() as i32;
+        let region_z = (top as f32 / 512.0).floor() as i32;
         let key = format!("r.{}.{}", region_x, region_z);
         if self.images.contains_key(&key) {
             let image_data = self.images.get(&key).unwrap();
@@ -227,7 +228,7 @@ impl Application<'_> {
             }
         }
 
-        binding.render().expect("Rendering panicked");
+        binding.render()?;
         Ok(())
     }
 }
