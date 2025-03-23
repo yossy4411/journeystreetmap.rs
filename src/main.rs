@@ -237,8 +237,8 @@ impl Application<'_> {
                         }
                         let ori_idx = (y * 512 + x) as usize;  // もとの画像データのインデックス
                         let color = image_data[ori_idx];
-                        let dest_x = x + rx * 512 - (left % 512);
-                        let dest_y = y + rz * 512 - (top % 512);
+                        let dest_x = x + rx * 512 - JourneyMapReader::positive_modulo(left, 512);
+                        let dest_y = y + rz * 512 - JourneyMapReader::positive_modulo(top, 512);
                         if dest_x < 0 || dest_x >= self.image_width as i32 || dest_y < 0 || dest_y >= self.image_height as i32 {
                             continue;
                         }
