@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::fmt::format;
 use journeystreetmap::journeymap;
 use journeystreetmap::journeymap::biome;
 use journeystreetmap::journeymap::biome::RGB;
@@ -20,6 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 struct Application {
     window: Option<Window>,
     image_state: ImageState,
+    images: HashMap<String, Vec<RGB>>,  // Regionごとの画像データをキャッシュするためのHashMap
 }
 
 
@@ -62,6 +65,7 @@ impl ApplicationHandler for Application {
             .create_window(window_attr)
             .expect("Failed to create window");
         self.window = Some(window);
+        self.load_images();
         self.render().expect("Failed to render");
     }
 
@@ -100,25 +104,17 @@ impl ApplicationHandler for Application {
 }
 
 impl Application {
-    fn render(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn load_images(&mut self) {
         let mut reader = journeymap::JourneyMapReader::new("/home/okayu/.local/share/ModrinthApp/profiles/Fabulously Optimized/journeymap/data/mp/160~251~235~246/");
         let region_offset_x = -1;
         let region_offset_z = -1;
 
-        let image_width = 800; // 1 chunk = 16 blocks, 32 chunks = 512 blocks (1 region)
-        let image_height = 800;
-        let window_size = self.window.as_ref().ok_or("window not initialized")?.inner_size();
-
-        let win = self.window.as_mut().ok_or("window not initialized")?;
-        let mut pixels = Pixels::new(image_width, image_height, SurfaceTexture::new(window_size.width, window_size.height, win))?;
-
         let stopwatch = std::time::Instant::now();
-        let mut image_data = vec![RGB::default(); (image_width * image_height) as usize];
 
-        for region_x in 0..=0 {
-            for region_z in 0..=0 {
+        for region_x in 0..=1 {
+            for region_z in 0..=1 {
                 reader.read_region(region_offset_x + region_x, region_offset_z + region_z).expect("Failed to read region");
-
+                let mut image_data = vec![RGB::default(); 512 * 512];
                 for i in 0..=31 {
                     for j in 0..=31 {
                         let chunk_result = reader.get_chunk(i, j);
@@ -134,20 +130,11 @@ impl Application {
                                 let z: i32 = splited.next().unwrap().parse().unwrap();
 
                                 // ブロック座標をリージョン内の相対座標に変換
-                                let block_x = x - 512 * region_offset_x;
-                                let block_z = z - 512 * region_offset_z;
-
-                                // X-Z平面にマッピング
-                                let pixel_x = block_x - self.image_state.offset_x as i32;
-                                let pixel_y = block_z - self.image_state.offset_y as i32;
-
-                                // ピクセル座標が画像内に収まらなかったらスキップ
-                                if pixel_x < 0 || pixel_x >= image_width as i32 || pixel_y < 0 || pixel_y >= image_height as i32 {
-                                    continue;
-                                }
+                                let pixel_x = x - 512 * (region_offset_x + region_x);
+                                let pixel_y = z - 512 * (region_offset_z + region_z);
 
                                 // RGBA配列のインデックスを計算
-                                let i = (pixel_y * image_width as i32 + pixel_x) as usize;
+                                let i = (pixel_y * 512 + pixel_x) as usize;
 
                                 // iが画像内に入るなら色を設定
                                 if i < image_data.len() {
@@ -156,7 +143,7 @@ impl Application {
 
                                     // Grid
                                     image_data[i] =
-                                        if block_x % 16 == 0 || block_z % 16 == 0 {
+                                        if pixel_x % 16 == 0 || pixel_y % 16 == 0 {
                                             color.blend(&RGB::new(255, 255, 255), 0.8)
                                         } else {
                                             color
@@ -169,26 +156,62 @@ impl Application {
                         }
                     }
                 }
+                self.images.insert(format!("r.{}.{}", region_x, region_z), image_data);
+
             }
         }
         println!("Time taken: {:?}", stopwatch.elapsed());
+    }
+
+    fn render(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let image_width = 800; // 1 chunk = 16 blocks, 32 chunks = 512 blocks (1 region)
+        let image_height = 800;
+
+        let win = self.window.as_mut().ok_or("window not initialized")?;
+        let window_size = win.inner_size();
+
+        let mut pixels = Pixels::new(image_width, image_height, SurfaceTexture::new(window_size.width, window_size.height, win))?;
+
 
         let frame = pixels.frame_mut();
 
         // フレームをクリア
         frame.fill(0);
 
-        // 画像データをフレームにコピー
-        for (i, pixel) in image_data.iter().enumerate() {
-            let i = i;
-            frame[i * 4] = pixel.r;
-            frame[i * 4 + 1] = pixel.g;
-            frame[i * 4 + 2] = pixel.b;
-            frame[i * 4 + 3] = 255;
+        // 映る範囲を計算
+        let left = self.image_state.offset_x as i32;
+        let top = self.image_state.offset_y as i32;
+        let region_x = left / 512;
+        let region_z = top / 512;
+        let key = format!("r.{}.{}", region_x, region_z);
+        if !self.images.contains_key(&key) {
+            return Ok(());
+        }
+        let image_data = self.images.get(&key).unwrap();
+
+        let block_offset_x = left % 512;
+        let block_offset_y = top % 512;
+        for x in block_offset_x..512 {
+            for y in block_offset_y..512 {
+                if x < 0 || x >= 512 || y < 0 || y >= 512 {
+                    continue;
+                }
+                let ori_idx = (y * 512 + x) as usize;  // もとの画像データのインデックス
+                let color = image_data[ori_idx];
+                let dest_x = x - block_offset_x;
+                let dest_y = y - block_offset_y;
+                if dest_x < 0 || dest_x >= image_width as i32 || dest_y < 0 || dest_y >= image_height as i32 {
+                    continue;
+                }
+                let dest_idx = (dest_y * image_width as i32 + dest_x) as usize;  // 表示する画像データのインデックス
+                frame[dest_idx * 4] = color.r;
+                frame[dest_idx * 4 + 1] = color.g;
+                frame[dest_idx * 4 + 2] = color.b;
+                frame[dest_idx * 4 + 3] = 255;
+            }
         }
 
         pixels.render().unwrap();
-        println!("Load and Render Taken: {:?}", stopwatch.elapsed());
         Ok(())
     }
 }
