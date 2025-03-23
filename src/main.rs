@@ -1,10 +1,12 @@
 use journeystreetmap::journeymap;
-use journeystreetmap::journeymap::biome;
+use journeystreetmap::journeymap::{biome, JourneyMapReader};
 use journeystreetmap::journeymap::biome::RGB;
 use pixels::{Pixels, SurfaceTexture};
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fs::File;
 use std::rc::Rc;
+use fastanvil::Region;
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
@@ -136,57 +138,71 @@ impl Application<'_> {
 
         let stopwatch = std::time::Instant::now();
 
-        for region_x in 0..=1 {
-            for region_z in 0..=1 {
-                reader.read_region(region_offset_x + region_x, region_offset_z + region_z)?;
-                let mut image_data = vec![RGB::default(); 512 * 512];
-                for i in 0..=31 {
-                    for j in 0..=31 {
-                        let chunk_result = reader.get_chunk(i, j);
-                        if let Ok(chunk) = chunk_result {
-                            if chunk.is_none() {
-                                println!("Chunk not found");
-                                continue;
-                            }
-                            let chunk = chunk.unwrap();
-                            for (pos, data) in chunk.sections {
-                                let mut splited = pos.split(',');
-                                let x: i32 = splited.next().unwrap().parse().unwrap();
-                                let z: i32 = splited.next().unwrap().parse().unwrap();
+        let mut threads = Vec::new();
 
-                                // ブロック座標をリージョン内の相対座標に変換
-                                let pixel_x = x - 512 * (region_offset_x + region_x);
-                                let pixel_y = z - 512 * (region_offset_z + region_z);
-
-                                // RGBA配列のインデックスを計算
-                                let i = (pixel_y * 512 + pixel_x) as usize;
-
-                                // iが画像内に入るなら色を設定
-                                if i < image_data.len() {
-                                    let color = biome::get_color(&data.biome_name);
-                                    image_data[i] = color;
-
-                                    // Grid
-                                    image_data[i] =
-                                        if pixel_x % 16 == 0 || pixel_y % 16 == 0 {
-                                            color.blend(&RGB::new(255, 255, 255), 0.8)
-                                        } else {
-                                            color
-                                        };
-                                }
-                            }
-                        } else {
-                            println!("Chunk load failed: {:?}", chunk_result.err());
-                            continue;
-                        }
-                    }
-                }
-                self.images.insert(format!("r.{}.{}", region_x, region_z), image_data);
-
+        for region_x in 0..=3 {
+            for region_z in 0..=3 {
+                let mut region = reader.read_region(region_offset_x + region_x, region_offset_z + region_z)?;
+                let thr = std::thread::spawn(move || {
+                    (format!("r.{}.{}", region_x, region_z), Self::buffer_region(&mut region, region_offset_x, region_offset_z, region_x, region_z))
+                });
+                threads.push(thr);
             }
+        }
+
+        for thr in threads {
+            let (key, content) = thr.join().unwrap();
+            self.images.insert(key, content);
         }
         println!("Time taken: {:?}", stopwatch.elapsed());
         Ok(())
+    }
+
+    fn buffer_region(region: &mut Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> Vec<RGB> {
+
+        let mut image_data = vec![RGB::default(); 512 * 512];
+        for i in 0..=31 {
+            for j in 0..=31 {
+                let chunk_result = JourneyMapReader::get_chunk(region, i, j);
+                if let Ok(chunk) = chunk_result {
+                    if chunk.is_none() {
+                        println!("Chunk not found");
+                        continue;
+                    }
+                    let chunk = chunk.unwrap();
+                    for (pos, data) in chunk.sections {
+                        let mut splited = pos.split(',');
+                        let x: i32 = splited.next().unwrap().parse().unwrap();
+                        let z: i32 = splited.next().unwrap().parse().unwrap();
+
+                        // ブロック座標をリージョン内の相対座標に変換
+                        let pixel_x = x - 512 * (region_offset_x + region_x);
+                        let pixel_y = z - 512 * (region_offset_z + region_z);
+
+                        // RGBA配列のインデックスを計算
+                        let i = (pixel_y * 512 + pixel_x) as usize;
+
+                        // iが画像内に入るなら色を設定
+                        if i < image_data.len() {
+                            let color = biome::get_color(&data.biome_name);
+                            image_data[i] = color;
+
+                            // Grid
+                            image_data[i] =
+                                if pixel_x % 16 == 0 || pixel_y % 16 == 0 {
+                                    color.blend(&RGB::new(255, 255, 255), 0.8)
+                                } else {
+                                    color
+                                };
+                        }
+                    }
+                } else {
+                    println!("Chunk load failed: {:?}", chunk_result.err());
+                    continue;
+                }
+            }
+        }
+        image_data
     }
 
     fn render(&mut self) -> Result<(), Box<dyn std::error::Error>> {

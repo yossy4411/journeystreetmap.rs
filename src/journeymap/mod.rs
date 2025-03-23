@@ -30,27 +30,24 @@ pub struct BlockState {
 
 pub struct JourneyMapReader<> {
     origin: String,
-    region: Option<Region<File>>,
 }
 
 impl JourneyMapReader {
     pub fn new(origin: &str) -> JourneyMapReader {
         JourneyMapReader {
             origin: origin.to_string(),
-            region: None
         }
     }
 
-    pub fn read_region(&mut self, x: i32, z: i32) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn read_region(&mut self, x: i32, z: i32) -> Result<Region<File>, Box<dyn std::error::Error>> {
         let filename = self.origin.clone() + &format!("overworld/cache/r.{}.{}.mca", x, z);
         let stream = File::open(filename)?;
-        self.region = Some(Region::from_stream(stream)?);
-        Ok(())
+        let region = Region::from_stream(stream)?;
+        Ok(region)
     }
 
-    pub fn get_chunk(&mut self, x: usize, z: usize) -> Result<Option<Chunk>, Box<dyn std::error::Error>> {
-
-        let region = self.region.as_mut().ok_or("Region not loaded")?;
+    pub fn get_chunk<T>(region: &mut Region<T>, x: usize, z: usize) -> Result<Option<Chunk>, Box<dyn std::error::Error>>
+    where T: std::io::Read + std::io::Seek {
         let chunk = region.read_chunk(x, z)?.ok_or("Chunk not found")?;
 
         // let parsed: fastnbt::error::Result<Chunk> = fastnbt::from_bytes(chunk.unwrap().as_slice());
@@ -60,7 +57,7 @@ impl JourneyMapReader {
             Err(e) => Err(e.into())
         }
     }
-
+/*
     // Gets the chunk at the specified chunk coordinates
     pub fn get_chunk_at(&mut self, x: i32, z: i32) -> Result<Option<Chunk>, Box<dyn std::error::Error>> {
         let region_x = (x as f32 / 32.0).floor() as i32;
@@ -69,7 +66,7 @@ impl JourneyMapReader {
         let chunk_z = Self::positive_modulo(z,32);  // Positive modulo
         self.read_region(region_x, region_z)?;
         self.get_chunk(chunk_x as usize, chunk_z as usize)
-    }
+    }*/
 
     pub fn positive_modulo(x: i32, m: i32) -> i32 {
         (x % m + m) % m
