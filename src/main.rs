@@ -142,9 +142,13 @@ impl Application<'_> {
 
         for region_x in 0..=3 {
             for region_z in 0..=3 {
-                let mut region = reader.read_region(region_offset_x + region_x, region_offset_z + region_z)?;
+                let mut region = reader.try_read_region(region_offset_x + region_x, region_offset_z + region_z);
+                if region.is_none() {
+                    println!("Region not found");
+                    continue;
+                }
                 let thr = std::thread::spawn(move || {
-                    (format!("r.{}.{}", region_x, region_z), Self::buffer_region(&mut region, region_offset_x, region_offset_z, region_x, region_z))
+                    (format!("r.{}.{}", region_x, region_z), Self::buffer_region(&mut region.unwrap(), region_offset_x, region_offset_z, region_x, region_z))
                 });
                 threads.push(thr);
             }

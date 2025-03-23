@@ -46,6 +46,27 @@ impl JourneyMapReader {
         Ok(region)
     }
 
+    pub fn try_read_region(&mut self, x: i32, z: i32) -> Option<Region<File>> {
+        let filename = self.origin.clone() + &format!("overworld/cache/r.{}.{}.mca", x, z);
+        if !std::path::Path::new(&filename).exists() {
+            return None;
+        }
+        let stream = File::open(filename);
+        match stream {
+            Ok(stream) => {
+                match Region::from_stream(stream) {
+                    Ok(region) => {
+                        Some(region)
+                    }
+                    Err(..) => {
+                        None
+                    }
+                }
+            },
+            Err(_) => None
+        }
+    }
+
     pub fn get_chunk<T>(region: &mut Region<T>, x: usize, z: usize) -> Result<Option<Chunk>, Box<dyn std::error::Error>>
     where T: std::io::Read + std::io::Seek {
         let chunk = region.read_chunk(x, z)?.ok_or("Chunk not found")?;
