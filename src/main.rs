@@ -150,14 +150,25 @@ impl ApplicationHandler for Application {
             } => {
                 if button == winit::event::MouseButton::Left {
                     if self.editable && state == ElementState::Pressed {
-                        let x = (self.image_state.last_mouse_x - self.image_state.offset_x) / self.image_state.zoom;
-                        let y = (self.image_state.last_mouse_y - self.image_state.offset_y) / self.image_state.zoom;
-                        if self.path.len() > 0 {
-                            self.path.line_to(x, y);
-                        } else {
-                            self.path.move_to(x, y);
+                        if self.edit_mode == EditingMode::Insert {
+                            let x = (self.image_state.last_mouse_x - self.image_state.offset_x) / self.image_state.zoom;
+                            let y = (self.image_state.last_mouse_y - self.image_state.offset_y) / self.image_state.zoom;
+                            if self.editing_type == EditingType::Poi {
+                                // todo 新しいウィンドウを開いてタグを入力する
+                                // winitで全部やるのは面倒すぎて死ぬやつ
+                                // 容量が小さくて使い勝手がいいやつ。
+                                // あと使い捨てになるし、ウィンドウで入力した情報が戻り値として返ってくるやつがいいネ
+                                // → GitHub Copilotによると、eguiが適してるって
+
+                            } else {
+                                if self.path.len() > 0 {
+                                    self.path.line_to(x, y);
+                                } else {
+                                    self.path.move_to(x, y);
+                                }
+                                self.window.as_ref().unwrap().request_redraw();
+                            }
                         }
-                        self.window.as_ref().unwrap().request_redraw();
                     } else {
                         self.image_state.dragging = state == winit::event::ElementState::Pressed;
                     }
