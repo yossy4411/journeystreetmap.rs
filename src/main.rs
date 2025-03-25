@@ -6,12 +6,12 @@ use std::fs::File;
 use std::num::NonZeroU32;
 use std::rc::Rc;
 use rusttype::{point, Font, OutlineBuilder, Scale};
-use tiny_skia::{Color, Path, PathBuilder, Pixmap, Rect, Stroke, Transform};
+use tiny_skia::{Color, Path, PathBuilder, Pixmap, Point, Rect, Stroke, Transform};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
-use winit::event::WindowEvent;
+use winit::event::{ElementState, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
-use winit::keyboard::PhysicalKey;
+use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowAttributes, WindowId};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -54,12 +54,31 @@ impl Default for ImageState {
     }
 }
 
-enum EditMode {
+// 編集モード
+#[derive(Eq, PartialEq, Hash, Copy, Clone, Debug)]
+enum EditingMode {
     Insert,
     Delete,
     Select,
     View,
 }
+
+// 編集対象
+#[derive(PartialEq, Hash, Copy, Clone, Debug)]
+enum EditingType {
+    Stroke,  // 線（道路）
+    Fill,    // 塗りつぶし（建物）
+    Poi,    // ポイント（村、都市、交差点...）
+}
+
+// 編集したものを保存するenum
+#[derive(Debug)]
+enum EditResult {
+    StrokePath(Path),
+    FillPath(Path),
+    PoiPoint(Point),
+}
+
 
 struct Application {
     image_state: ImageState,
@@ -69,9 +88,11 @@ struct Application {
     window: Option<Rc<Window>>,
     width: u32,
     height: u32,
-    edit_mode: EditMode,
+    edit_mode: EditingMode,
     editable: bool,
     font: Font<'static>,
+    editing_type: EditingType,
+    path: PathBuilder,
 }
 
 impl Application {
@@ -84,9 +105,11 @@ impl Application {
             window: None,
             width: 800,
             height: 800,
-            edit_mode: EditMode::View,
+            edit_mode: EditingMode::View,
             editable: false,
             font: Font::try_from_bytes(include_bytes!("../fonts/NotoSansJP-Regular.ttf") as &[u8]).unwrap(),
+            editing_type: EditingType::Stroke,
+            path: PathBuilder::new(),
         }
     }
 }
@@ -126,7 +149,18 @@ impl ApplicationHandler for Application {
                 ..
             } => {
                 if button == winit::event::MouseButton::Left {
-                    self.image_state.dragging = state == winit::event::ElementState::Pressed;
+                    if self.editable && state == ElementState::Pressed {
+                        let x = (self.image_state.last_mouse_x - self.image_state.offset_x) / self.image_state.zoom;
+                        let y = (self.image_state.last_mouse_y - self.image_state.offset_y) / self.image_state.zoom;
+                        if self.path.len() > 0 {
+                            self.path.line_to(x, y);
+                        } else {
+                            self.path.move_to(x, y);
+                        }
+                        self.window.as_ref().unwrap().request_redraw();
+                    } else {
+                        self.image_state.dragging = state == winit::event::ElementState::Pressed;
+                    }
                 }
             }
             WindowEvent::CursorMoved {
@@ -182,27 +216,49 @@ impl ApplicationHandler for Application {
                 event,
                 ..
             } => {
-                if event.state == winit::event::ElementState::Pressed {
-                    match event.logical_key {
-                        PhysicalKey::Code(winit::keyboard::KeyCode::KeyI) => {
-                            // 挿入(Insert)モードに入る
-                            self.edit_mode = EditMode::Insert;
+                match event.logical_key {
+                    Key::Character(s) => {
+                        if event.state == ElementState::Pressed {
+                            match s.to_uppercase().as_str() {
+                                "I" => {
+                                    self.edit_mode = EditingMode::Insert;
+                                    println!("Insert mode");
+                                }
+                                "D" => {
+                                    self.edit_mode = EditingMode::Delete;
+                                    println!("Delete mode");
+                                }
+                                "S" => {
+                                    self.edit_mode = EditingMode::Select;
+                                    println!("Select mode");
+                                }
+                                "V" => {
+                                    self.edit_mode = EditingMode::View;
+                                    println!("View mode");
+                                }
+                                "E" => {
+                                    // 編集対象を周期的に切り替える
+                                    self.editing_type = match self.editing_type {
+                                        EditingType::Stroke => EditingType::Fill,
+                                        EditingType::Fill => EditingType::Poi,
+                                        EditingType::Poi => EditingType::Stroke,
+                                    };
+                                }
+                                _ => {}
+                            }
                         }
-                        PhysicalKey::Code(winit::keyboard::KeyCode::KeyD) => {
-                            // 削除(Delete)モードに入る
-                            self.edit_mode = EditMode::Delete;
-                        }
-                        PhysicalKey::Code(winit::keyboard::KeyCode::KeyS) => {
-                            // 選択(Select)モードに入る
-                            self.edit_mode = EditMode::Select;
-                        }
-                        PhysicalKey::Code(winit::keyboard::KeyCode::KeyV) => {
-                            // 表示(View)モードに入る
-                            self.edit_mode = EditMode::View;
-                        }
-                        _ => {}
                     }
+                    Key::Named(name) => {
+                        match name {
+                            NamedKey::Shift => {
+                                self.editable = event.state == ElementState::Pressed;
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ => {}
                 }
+                self.window.as_ref().unwrap().request_redraw();
             }
             _ => {}
         }
@@ -331,17 +387,65 @@ impl Application {
         }
 
         // テキストの描画
-        Self::draw_text(pixmap, &self.font, Scale::uniform(16.0), rusttype::point(0.0, 0.0), "Hello, world!");
+        let mut mode: String = match self.edit_mode {
+            EditingMode::Insert => "Insert",
+            EditingMode::Delete => "Delete",
+            EditingMode::Select => "Select",
+            EditingMode::View => "View",
+        }.to_string();
+
+        let mut color = Color::WHITE;
+        if self.edit_mode != EditingMode::View {
+            mode += match self.editing_type {
+                EditingType::Stroke => " Stroke",
+                EditingType::Fill => " Fill",
+                EditingType::Poi => " Poi",
+            };
+            if !self.editable {
+                color.apply_opacity(0.5);
+            }
+
+            match self.editing_type {
+                EditingType::Fill => {
+                    let mut path = self.path.clone();
+                    path.close();
+                    if let Some(path) = path.finish() {
+                        let paint = tiny_skia::Paint {
+                            shader: tiny_skia::Shader::SolidColor(Color::from_rgba8(255, 100, 100, 100)),  // red
+                            ..Default::default()
+                        };
+                        pixmap.stroke_path(&path, &paint, &Stroke{width:2.0, ..Default::default()}, transform.clone(), None);
+                        pixmap.fill_path(&path, &paint, tiny_skia::FillRule::Winding, transform.clone(), None);
+                    }
+                }
+                EditingType::Stroke => {
+                    if let Some(path) = self.path.clone().finish() {
+                        let paint = tiny_skia::Paint {
+                            shader: tiny_skia::Shader::SolidColor(Color::from_rgba8(100, 100, 255, 100)),  // blue
+                            ..Default::default()
+                        };
+                        pixmap.stroke_path(&path, &paint, &Stroke { width: 2.0, ..Default::default() }, transform.clone(), None);
+                        let paint = tiny_skia::Paint {
+                            shader: tiny_skia::Shader::SolidColor(Color::from_rgba8(255, 255, 255, 50)),  // white
+                            ..Default::default()
+                        };
+                        pixmap.stroke_path(&path, &paint, &Stroke { width: 1.0, ..Default::default() }, transform.clone(), None);
+                    }
+                }
+                _ => {}
+            }
+        }
+        Self::draw_text(pixmap, &self.font, Scale::uniform(16.0), rusttype::point(6.0, self.height as f32 - 20.0), &mode, color);
 
 
         Ok(())
     }
 
 
-    fn draw_text(pixmap: &mut Pixmap, font: &Font, scale: Scale, start: rusttype::Point<f32>, text: &str) {
+    fn draw_text(pixmap: &mut Pixmap, font: &Font, scale: Scale, start: rusttype::Point<f32>, text: &str, color: Color) {
         // Paintの設定
         let paint = tiny_skia::Paint {
-            shader: tiny_skia::Shader::SolidColor(Color::from_rgba8(0, 128, 0, 255)), // 緑色のテキスト
+            shader: tiny_skia::Shader::SolidColor(color), // 緑色のテキスト
             ..Default::default()
         };
 

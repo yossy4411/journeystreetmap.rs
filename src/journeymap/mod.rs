@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fs::File;
 
 pub mod biome;
+mod decoration;
 
 #[derive(Deserialize)]
 pub struct PositionData {
