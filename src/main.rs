@@ -208,41 +208,43 @@ impl Application {
         for i in 0..=31 {
             for j in 0..=31 {
                 let chunk_result = JourneyMapReader::get_chunk(region, i, j);
-                if let Ok(chunk) = chunk_result {
-                    if chunk.is_none() {
-                        println!("Chunk not found");
+                match chunk_result {
+                    Err(..) => {
                         continue;
                     }
-                    let chunk = chunk.unwrap();
-                    for (pos, data) in chunk.sections {
-                        let mut splited = pos.split(',');
-                        let x: i32 = splited.next().unwrap().parse().unwrap();
-                        let z: i32 = splited.next().unwrap().parse().unwrap();
+                    Ok(chunk) => {
+                        if chunk.is_none() {
+                            println!("Chunk not found");
+                            continue;
+                        }
+                        let chunk = chunk.unwrap();
+                        for (pos, data) in chunk.sections {
+                            let mut splited = pos.split(',');
+                            let x: i32 = splited.next().unwrap().parse().unwrap();
+                            let z: i32 = splited.next().unwrap().parse().unwrap();
 
-                        // ブロック座標をリージョン内の相対座標に変換
-                        let pixel_x = x - 512 * (region_offset_x + region_x);
-                        let pixel_y = z - 512 * (region_offset_z + region_z);
+                            // ブロック座標をリージョン内の相対座標に変換
+                            let pixel_x = x - 512 * (region_offset_x + region_x);
+                            let pixel_y = z - 512 * (region_offset_z + region_z);
 
-                        // RGBA配列のインデックスを計算
-                        let i = (pixel_y * 512 + pixel_x) as usize;
+                            // RGBA配列のインデックスを計算
+                            let i = (pixel_y * 512 + pixel_x) as usize;
 
-                        // iが画像内に入るなら色を設定
-                        if i < 512 * 512 {
-                            let color = biome::get_color(&data.biome_name);
-                            // Grid
-                            let color: Color =
-                                if pixel_x % 16 == 0 || pixel_y % 16 == 0 {
-                                    color.blend(&RGB::new(255, 255, 255), 0.8).into()
-                                } else {
-                                    color.into()
-                                };
+                            // iが画像内に入るなら色を設定
+                            if i < 512 * 512 {
+                                let color = biome::get_color(&data.biome_name);
+                                // Grid
+                                let color: Color =
+                                    if pixel_x % 16 == 0 || pixel_y % 16 == 0 {
+                                        color.blend(&RGB::new(255, 255, 255), 0.8).into()
+                                    } else {
+                                        color.into()
+                                    };
 
-                            image_data[i] = color.premultiply().to_color_u8()
+                                image_data[i] = color.premultiply().to_color_u8()
+                            }
                         }
                     }
-                } else {
-                    println!("Chunk load failed: {:?}", chunk_result.err());
-                    continue;
                 }
             }
         }
