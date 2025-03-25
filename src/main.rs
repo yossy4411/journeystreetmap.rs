@@ -156,11 +156,12 @@ impl ApplicationHandler for Application {
             } => {
                 match delta {
                     winit::event::MouseScrollDelta::LineDelta(_x, y) => {
-                        if y > 0.0 {
-                            self.image_state.zoom = self.image_state.zoom * 1.1;
-                        } else {
-                            self.image_state.zoom = self.image_state.zoom / 1.1;
-                        }
+                        let factor = if y > 0.0 { 1.1 } else { 1.0 / 1.1 };
+                        self.image_state.zoom *= factor;
+
+                        self.image_state.offset_x = (self.image_state.offset_x - self.image_width as f32  / 2.0) * factor + self.image_width as f32  / 2.0;
+                        self.image_state.offset_y = (self.image_state.offset_y - self.image_height as f32 / 2.0) * factor + self.image_height as f32 / 2.0;
+
                         self.window.as_mut().unwrap().request_redraw();
                     }
                     _ => {}
