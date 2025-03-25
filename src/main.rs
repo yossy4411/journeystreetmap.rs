@@ -1,12 +1,12 @@
 use fastanvil::Region;
 use journeystreetmap::journeymap::biome::RGB;
 use journeystreetmap::journeymap::{biome, JourneyMapReader};
+use softbuffer::{Context, Surface};
 use std::collections::HashMap;
 use std::fs::File;
 use std::num::NonZeroU32;
 use std::rc::Rc;
-use softbuffer::{Context, Surface};
-use tiny_skia::{BlendMode, Color, Pixmap, PremultipliedColor, Transform};
+use tiny_skia::{Color, Pixmap, Transform};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
@@ -58,9 +58,8 @@ struct Application {
     canvas: Option<Pixmap>,
     surface: Option<Surface<Rc<Window>, Rc<Window>>>,
     window: Option<Rc<Window>>,
-    image_width: u32,
-    image_height: u32,
-    last_rendered: std::time::Instant,
+    width: u32,
+    height: u32,
 }
 
 impl Application {
@@ -71,9 +70,8 @@ impl Application {
             canvas: None,
             surface: None,
             window: None,
-            image_width: 800,
-            image_height: 800,
-            last_rendered: std::time::Instant::now(),
+            width: 800,
+            height: 800,
         }
     }
 }
@@ -81,7 +79,7 @@ impl Application {
 impl ApplicationHandler for Application {
     fn resumed(& mut self, event_loop: &ActiveEventLoop) {
         let window_attr = WindowAttributes::default()
-            .with_inner_size(PhysicalSize::new(self.image_width, self.image_height))
+            .with_inner_size(PhysicalSize::new(self.width, self.height))
             .with_title("JourneyMap Viewer");
         let window = event_loop
             .create_window(window_attr)
@@ -90,7 +88,7 @@ impl ApplicationHandler for Application {
         let window_rc = Rc::new(window);
 
 
-        let canvas = Pixmap::new(self.image_width, self.image_height).unwrap();
+        let canvas = Pixmap::new(self.width, self.height).unwrap();
         let context = Context::new(window_rc.clone()).unwrap();
         let surface = Surface::new(&context, window_rc.clone()).unwrap();
         self.window = Some(window_rc);
@@ -132,23 +130,20 @@ impl ApplicationHandler for Application {
                 self.image_state.last_mouse_y = position.y;
             }
             WindowEvent::RedrawRequested => {
-                {
-                    self.render().expect("Failed to render");
-                }
+                self.render().expect("Failed to render");
 
                 let surface = self.surface.as_mut().unwrap();
 
-                surface.resize(NonZeroU32::new(self.image_width).unwrap(), NonZeroU32::new(self.image_height).unwrap()).expect("aaaaahhhh");
+                surface.resize(NonZeroU32::new(self.width).unwrap(), NonZeroU32::new(self.height).unwrap()).expect("Failed to resize");
                 let mut buffer = surface.buffer_mut().unwrap();
                 let data = self.canvas.as_ref().unwrap().data();
-                for index in 0..(self.image_width * self.image_height) as usize {
+                for index in 0..(self.width * self.height) as usize {
                     buffer[index] =
                         data[index * 4 + 2] as u32
                             | (data[index * 4 + 1] as u32) << 8
                             | (data[index * 4 + 0] as u32) << 16;
                 }
                 buffer.present().unwrap();
-
             }
             WindowEvent::MouseWheel {
                 delta,
@@ -159,8 +154,8 @@ impl ApplicationHandler for Application {
                         let factor = if y > 0.0 { 1.1 } else { 1.0 / 1.1 };
                         self.image_state.zoom *= factor;
 
-                        self.image_state.offset_x = (self.image_state.offset_x - self.image_width as f32  / 2.0) * factor + self.image_width as f32  / 2.0;
-                        self.image_state.offset_y = (self.image_state.offset_y - self.image_height as f32 / 2.0) * factor + self.image_height as f32 / 2.0;
+                        self.image_state.offset_x = (self.image_state.offset_x - self.width as f32  / 2.0) * factor + self.width as f32  / 2.0;
+                        self.image_state.offset_y = (self.image_state.offset_y - self.height as f32 / 2.0) * factor + self.height as f32 / 2.0;
 
                         self.window.as_mut().unwrap().request_redraw();
                     }
@@ -185,7 +180,7 @@ impl Application {
 
         for region_x in -1..=3 {
             for region_z in -1..=3 {
-                let mut region = reader.try_read_region(region_offset_x + region_x, region_offset_z + region_z);
+                let region = reader.try_read_region(region_offset_x + region_x, region_offset_z + region_z);
                 if region.is_none() {
                     println!("Region not found");
                     continue;
@@ -207,7 +202,7 @@ impl Application {
 
     fn buffer_region(region: &mut Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> Pixmap {
         let mut pixmap = Pixmap::new(512, 512).unwrap();
-        let mut image_data = pixmap.pixels_mut();
+        let image_data = pixmap.pixels_mut();
         for i in 0..=31 {
             for j in 0..=31 {
                 let chunk_result = JourneyMapReader::get_chunk(region, i, j);
@@ -253,7 +248,7 @@ impl Application {
     }
 
     fn render(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let pixmap = self.canvas.as_mut().unwrap();
+        let pixmap = self.canvas.as_mut().ok_or("Canvas not found")?;
         let transform = Transform::from_scale(self.image_state.zoom, self.image_state.zoom)
             .post_translate(self.image_state.offset_x, self.image_state.offset_y);
         {
