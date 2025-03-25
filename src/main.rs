@@ -268,23 +268,25 @@ impl Application {
             let dest_y = rz * 512;
             pixmap.draw_pixmap(dest_x, dest_y, img.as_ref(), &pixmap_paint, transform.clone(), None);
             // でかいほうのグリッド
-            let path = tiny_skia::PathBuilder::from_rect(Rect::from_xywh(dest_x as f32 + 0.5, dest_y as f32 + 0.5, 512.0, 512.0).unwrap());
             let stroke = Stroke {
-                width: 1.0,
+                width: 0.2,
                 ..Default::default()
             };
+
+            let path = tiny_skia::PathBuilder::from_rect(Rect::from_xywh(dest_x as f32, dest_y as f32, 512.0, 512.0).unwrap());
             pixmap.stroke_path(&path, &rect_paint, &stroke, transform.clone(), None);
+
             // 小さいほうのグリッド
             for i in 0..=32 {
-                let x = dest_x as f32 + i as f32 * 16.0 + 0.5;
-                let y = dest_y as f32 + i as f32 * 16.0 + 0.5;
+                let x = dest_x as f32 + i as f32 * 16.0;
+                let y = dest_y as f32 + i as f32 * 16.0;
                 let mut path = tiny_skia::PathBuilder::new();
-                path.move_to(x, dest_y as f32 + 0.5);
-                path.line_to(x, dest_y as f32 + 512.5);
+                path.move_to(x, dest_y as f32);
+                path.line_to(x, dest_y as f32 + 512.0);
                 pixmap.stroke_path(&path.finish().unwrap(), &grid_paint, &stroke, transform.clone(), None);
                 let mut path = tiny_skia::PathBuilder::new();
-                path.move_to(dest_x as f32 + 0.5, y);
-                path.line_to(dest_x as f32 + 512.5, y);
+                path.move_to(dest_x as f32, y);
+                path.line_to(dest_x as f32 + 512.0, y);
                 pixmap.stroke_path(&path.finish().unwrap(), &grid_paint, &stroke, transform.clone(), None);
             }
         }
