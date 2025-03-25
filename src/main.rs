@@ -54,7 +54,7 @@ impl Default for ImageState {
 
 struct Application {
     image_state: ImageState,
-    images: HashMap<String, Pixmap>,  // Regionごとの画像データをキャッシュするためのHashMap
+    images: HashMap<(i32, i32), Pixmap>,  // Regionごとの画像データをキャッシュするためのHashMap
     canvas: Option<Pixmap>,
     surface: Option<Surface<Rc<Window>, Rc<Window>>>,
     window: Option<Rc<Window>>,
@@ -190,7 +190,7 @@ impl Application {
                     continue;
                 }
                 let thr = std::thread::spawn(move || {
-                    (format!("r.{}.{}", region_x, region_z), Self::buffer_region(&mut region.unwrap(), region_offset_x, region_offset_z, region_x, region_z))
+                    ((region_x, region_z), Self::buffer_region(&mut region.unwrap(), region_offset_x, region_offset_z, region_x, region_z))
                 });
                 threads.push(thr);
             }
@@ -259,26 +259,10 @@ impl Application {
 
             let paint = tiny_skia::PixmapPaint::default();
 
-            // 映る範囲を計算
-            let left = self.image_state.offset_x as i32;
-            let top = self.image_state.offset_y as i32;
-            let region_left_x = (left as f32 / 512.0).floor() as i32;
-            let region_left_z = (top as f32 / 512.0).floor() as i32;
-            let x_times = (512 + 800) as f32 / 512.0 / self.image_state.zoom;
-            let y_times = (512 + 800) as f32 / 512.0 / self.image_state.zoom;
-            for rx in 0..=x_times as i32 {
-                for rz in 0..=y_times as i32 {
-                    let region_x = region_left_x + rx;
-                    let region_z = region_left_z + rz;
-                    let key = format!("r.{}.{}", region_x, region_z);
-                    if !self.images.contains_key(&key) {
-                        continue;
-                    }
-                    let image_data = self.images.get(&key).unwrap();
-                    let dest_x = rx * 512 - JourneyMapReader::positive_modulo(left, 512);
-                    let dest_y = rz * 512 - JourneyMapReader::positive_modulo(top, 512);
-                    pixmap.draw_pixmap(dest_x, dest_y, image_data.as_ref(), &paint, Transform::default(), None)
-                }
+            for ((rx, rz), img) in &self.images {
+                let dest_x = rx * 512;
+                let dest_y = rz * 512;
+                pixmap.draw_pixmap(dest_x, dest_y, img.as_ref(), &paint, Transform::default(), None)
             }
         }
 
