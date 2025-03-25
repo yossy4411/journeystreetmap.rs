@@ -1,12 +1,11 @@
 use fastanvil::Region;
-use journeystreetmap::journeymap::biome::RGB;
 use journeystreetmap::journeymap::{biome, JourneyMapReader};
 use softbuffer::{Context, Surface};
 use std::collections::HashMap;
 use std::fs::File;
 use std::num::NonZeroU32;
 use std::rc::Rc;
-use tiny_skia::{Color, Pixmap, Transform};
+use tiny_skia::{Color, Pixmap, Rect, Stroke, Transform};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
@@ -236,14 +235,7 @@ impl Application {
                             // iが画像内に入るなら色を設定
                             if i < 512 * 512 {
                                 let color = biome::get_color(&data.biome_name);
-                                // Grid
-                                let color: Color =
-                                    if pixel_x % 16 == 0 || pixel_y % 16 == 0 {
-                                        color.blend(&RGB::new(255, 255, 255), 0.8).into()
-                                    } else {
-                                        color.into()
-                                    };
-
+                                let color: Color = color.into();
                                 image_data[i] = color.premultiply().to_color_u8()
                             }
                         }
@@ -258,19 +250,44 @@ impl Application {
         let pixmap = self.canvas.as_mut().ok_or("Canvas not found")?;
         let transform = Transform::from_scale(self.image_state.zoom, self.image_state.zoom)
             .post_translate(self.image_state.offset_x, self.image_state.offset_y);
-        {
-            // 黒でクリア
-            pixmap.fill(Color::BLACK);
+        // 黒でクリア
+        pixmap.fill(Color::BLACK);
 
-            let paint = tiny_skia::PixmapPaint::default();
+        let pixmap_paint = tiny_skia::PixmapPaint::default();
+        let rect_paint = tiny_skia::Paint {
+            shader: tiny_skia::Shader::SolidColor(Color::from_rgba8(255, 255, 255, 255)),
+            ..Default::default()
+        };
+        let grid_paint = tiny_skia::Paint {
+            shader: tiny_skia::Shader::SolidColor(Color::from_rgba8(255, 255, 255, 100)),
+            ..Default::default()
+        };
 
-            for ((rx, rz), img) in &self.images {
-                let dest_x = rx * 512;
-                let dest_y = rz * 512;
-                pixmap.draw_pixmap(dest_x, dest_y, img.as_ref(), &paint, transform.clone(), None)
+        for ((rx, rz), img) in &self.images {
+            let dest_x = rx * 512;
+            let dest_y = rz * 512;
+            pixmap.draw_pixmap(dest_x, dest_y, img.as_ref(), &pixmap_paint, transform.clone(), None);
+            // でかいほうのグリッド
+            let path = tiny_skia::PathBuilder::from_rect(Rect::from_xywh(dest_x as f32 + 0.5, dest_y as f32 + 0.5, 512.0, 512.0).unwrap());
+            let stroke = Stroke {
+                width: 1.0,
+                ..Default::default()
+            };
+            pixmap.stroke_path(&path, &rect_paint, &stroke, transform.clone(), None);
+            // 小さいほうのグリッド
+            for i in 0..=32 {
+                let x = dest_x as f32 + i as f32 * 16.0 + 0.5;
+                let y = dest_y as f32 + i as f32 * 16.0 + 0.5;
+                let mut path = tiny_skia::PathBuilder::new();
+                path.move_to(x, dest_y as f32 + 0.5);
+                path.line_to(x, dest_y as f32 + 512.5);
+                pixmap.stroke_path(&path.finish().unwrap(), &grid_paint, &stroke, transform.clone(), None);
+                let mut path = tiny_skia::PathBuilder::new();
+                path.move_to(dest_x as f32 + 0.5, y);
+                path.line_to(dest_x as f32 + 512.5, y);
+                pixmap.stroke_path(&path.finish().unwrap(), &grid_paint, &stroke, transform.clone(), None);
             }
         }
-
 
         Ok(())
     }
