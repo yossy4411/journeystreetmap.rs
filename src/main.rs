@@ -124,8 +124,8 @@ impl ApplicationHandler for Application {
                 let dx = position.x - self.image_state.last_mouse_x;
                 let dy = position.y - self.image_state.last_mouse_y;
                 if self.image_state.dragging {
-                    self.image_state.offset_x -= dx;
-                    self.image_state.offset_y -= dy;   // Y軸は上下逆
+                    self.image_state.offset_x += dx;
+                    self.image_state.offset_y += dy;   // Y軸は上下逆
                     self.window.as_ref().unwrap().request_redraw();
                 }
                 self.image_state.last_mouse_x = position.x;
@@ -253,6 +253,8 @@ impl Application {
 
     fn render(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let pixmap = self.canvas.as_mut().unwrap();
+        let transform = Transform::from_scale(self.image_state.zoom, self.image_state.zoom)
+            .post_translate(self.image_state.offset_x, self.image_state.offset_y);
         {
             // 黒でクリア
             pixmap.fill(Color::BLACK);
@@ -262,7 +264,7 @@ impl Application {
             for ((rx, rz), img) in &self.images {
                 let dest_x = rx * 512;
                 let dest_y = rz * 512;
-                pixmap.draw_pixmap(dest_x, dest_y, img.as_ref(), &paint, Transform::default(), None)
+                pixmap.draw_pixmap(dest_x, dest_y, img.as_ref(), &paint, transform.clone(), None)
             }
         }
 
