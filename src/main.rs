@@ -25,6 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 // 画像の状態を管理する構造体
 struct ImageState {
     zoom: f32,
+    zoom_factor: f32,
     offset_x: f32,
     offset_y: f32,
     dragging: bool,
@@ -36,6 +37,7 @@ impl ImageState {
     fn new() -> Self {
         Self {
             zoom: 1.0,
+            zoom_factor: 1.25,
             offset_x: 0.0,
             offset_y: 0.0,
             dragging: false,
@@ -129,6 +131,25 @@ impl ApplicationHandler for Application {
                 self.image_state.last_mouse_x = position.x;
                 self.image_state.last_mouse_y = position.y;
             }
+            WindowEvent::MouseWheel {
+                delta,
+                ..
+            } => {
+                match delta {
+                    winit::event::MouseScrollDelta::LineDelta(_x, y) => {
+                        let factor = if y > 0.0 { self.image_state.zoom_factor } else { 1.0 / self.image_state.zoom_factor };
+                        self.image_state.zoom *= factor;
+
+                        let zoom_origin_x = self.image_state.last_mouse_x;
+                        let zoom_origin_y = self.image_state.last_mouse_y;
+                        self.image_state.offset_x = (self.image_state.offset_x - zoom_origin_x) * factor + zoom_origin_x;
+                        self.image_state.offset_y = (self.image_state.offset_y - zoom_origin_y) * factor + zoom_origin_y;
+
+                        self.window.as_mut().unwrap().request_redraw();
+                    }
+                    _ => {}
+                }
+            }
             WindowEvent::RedrawRequested => {
                 self.render().expect("Failed to render");
 
@@ -145,24 +166,6 @@ impl ApplicationHandler for Application {
                 }
                 buffer.present().unwrap();
             }
-            WindowEvent::MouseWheel {
-                delta,
-                ..
-            } => {
-                match delta {
-                    winit::event::MouseScrollDelta::LineDelta(_x, y) => {
-                        let factor = if y > 0.0 { 1.1 } else { 1.0 / 1.1 };
-                        self.image_state.zoom *= factor;
-
-                        self.image_state.offset_x = (self.image_state.offset_x - self.width as f32  / 2.0) * factor + self.width as f32  / 2.0;
-                        self.image_state.offset_y = (self.image_state.offset_y - self.height as f32 / 2.0) * factor + self.height as f32 / 2.0;
-
-                        self.window.as_mut().unwrap().request_redraw();
-                    }
-                    _ => {}
-                }
-            }
-
             _ => {}
         }
     }
