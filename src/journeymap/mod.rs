@@ -39,6 +39,23 @@ impl JourneyMapReader {
         }
     }
 
+    pub fn get_regions_list(&self) -> Vec<(i32, i32)> {
+        let mut regions = Vec::new();
+        let path = std::path::Path::new(&self.origin).join("overworld/cache");
+        for entry in path.read_dir().expect("Failed to read directory") {
+            let entry = entry.expect("Failed to read entry");
+            let path = entry.path();
+            let filename = path.file_name().unwrap().to_str().unwrap();
+            if filename.starts_with("r.") && filename.ends_with(".mca") {
+                let splited: Vec<&str> = filename.split('.').collect();
+                let x = splited[1].parse().unwrap();
+                let z = splited[2].parse().unwrap();
+                regions.push((x, z));
+            }
+        }
+        regions
+    }
+
     pub fn read_region(&mut self, x: i32, z: i32) -> Result<Region<File>, Box<dyn std::error::Error>> {
         let filename = self.origin.clone() + &format!("overworld/cache/r.{}.{}.mca", x, z);
         let stream = File::open(filename)?;
@@ -54,6 +71,9 @@ impl JourneyMapReader {
         let stream = File::open(filename);
         match stream {
             Ok(stream) => {
+                if stream.metadata().unwrap().len() == 0 {
+                    return None;   // 空っぽファイルはいらないよ
+                }
                 match Region::from_stream(stream) {
                     Ok(region) => {
                         Some(region)

@@ -177,19 +177,21 @@ impl Application {
         let stopwatch = std::time::Instant::now();
 
         let mut threads = Vec::new();
+        let regions = reader.get_regions_list();
 
-        for region_x in -1..=3 {
-            for region_z in -1..=3 {
-                let region = reader.try_read_region(region_offset_x + region_x, region_offset_z + region_z);
-                if region.is_none() {
-                    println!("Region not found");
-                    continue;
-                }
+        for (region_x, region_z) in regions {
+            let region = reader.try_read_region(region_offset_x + region_x, region_offset_z + region_z);
+            if let Some(mut region) = region {
                 let thr = std::thread::spawn(move || {
-                    ((region_x, region_z), Self::buffer_region(&mut region.unwrap(), region_offset_x, region_offset_z, region_x, region_z))
+                    ((region_x, region_z), Self::buffer_region(&mut region, region_offset_x, region_offset_z, region_x, region_z))
                 });
                 threads.push(thr);
+            } else {
+                println!("Region not found");
+                continue;
             }
+
+
         }
 
         for thr in threads {
