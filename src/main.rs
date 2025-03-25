@@ -10,6 +10,7 @@ use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
+use winit::keyboard::PhysicalKey;
 use winit::window::{Window, WindowAttributes, WindowId};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -52,6 +53,12 @@ impl Default for ImageState {
     }
 }
 
+enum EditMode {
+    Insert,
+    Delete,
+    Select,
+    View,
+}
 
 struct Application {
     image_state: ImageState,
@@ -61,6 +68,7 @@ struct Application {
     window: Option<Rc<Window>>,
     width: u32,
     height: u32,
+    edit_mode: EditMode,
 }
 
 impl Application {
@@ -73,6 +81,7 @@ impl Application {
             window: None,
             width: 800,
             height: 800,
+            edit_mode: EditMode::View,
         }
     }
 }
@@ -143,7 +152,6 @@ impl ApplicationHandler for Application {
                         let zoom_origin_y = self.image_state.last_mouse_y;
                         self.image_state.offset_x = (self.image_state.offset_x - zoom_origin_x) * factor + zoom_origin_x;
                         self.image_state.offset_y = (self.image_state.offset_y - zoom_origin_y) * factor + zoom_origin_y;
-
                         self.window.as_mut().unwrap().request_redraw();
                     }
                     _ => {}
@@ -164,6 +172,32 @@ impl ApplicationHandler for Application {
                             | (data[index * 4 + 0] as u32) << 16;
                 }
                 buffer.present().unwrap();
+            }
+            WindowEvent::KeyboardInput {
+                event,
+                ..
+            } => {
+                if event.state == winit::event::ElementState::Pressed {
+                    match event.logical_key {
+                        PhysicalKey::Code(winit::keyboard::KeyCode::KeyI) => {
+                            // 挿入(Insert)モードに入る
+                            self.edit_mode = EditMode::Insert;
+                        }
+                        PhysicalKey::Code(winit::keyboard::KeyCode::KeyD) => {
+                            // 削除(Delete)モードに入る
+                            self.edit_mode = EditMode::Delete;
+                        }
+                        PhysicalKey::Code(winit::keyboard::KeyCode::KeyS) => {
+                            // 選択(Select)モードに入る
+                            self.edit_mode = EditMode::Select;
+                        }
+                        PhysicalKey::Code(winit::keyboard::KeyCode::KeyV) => {
+                            // 表示(View)モードに入る
+                            self.edit_mode = EditMode::View;
+                        }
+                        _ => {}
+                    }
+                }
             }
             _ => {}
         }
