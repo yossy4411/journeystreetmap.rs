@@ -1,17 +1,17 @@
 use fastanvil::Region;
-use journeystreetmap::journeymap;
 use journeystreetmap::journeymap::biome::RGB;
 use journeystreetmap::journeymap::{biome, JourneyMapReader};
-use pixels::{Pixels, SurfaceTexture};
 use std::collections::HashMap;
 use std::fs::File;
-use std::sync::{Arc, Mutex};
-use std::thread::JoinHandle;
+use std::num::NonZeroU32;
+use std::rc::Rc;
+use softbuffer::{Context, Surface};
+use tiny_skia::{BlendMode, Color, Pixmap, PremultipliedColor, Transform};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
-use winit::window::{WindowAttributes, WindowId};
+use winit::window::{Window, WindowAttributes, WindowId};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let event_loop = winit::event_loop::EventLoop::new();
@@ -54,8 +54,10 @@ impl Default for ImageState {
 
 struct Application {
     image_state: ImageState,
-    images: HashMap<String, Vec<RGB>>,  // Regionごとの画像データをキャッシュするためのHashMap
-    pixels: Option<Arc<Mutex<Pixels<'static>>>>, // 'staticにするとなんかへんかなって思ったからとりまApplicationと同じライフタイムにしてみた
+    images: HashMap<String, Pixmap>,  // Regionごとの画像データをキャッシュするためのHashMap
+    canvas: Option<Pixmap>,
+    surface: Option<Surface<Rc<Window>, Rc<Window>>>,
+    window: Option<Rc<Window>>,
     image_width: u32,
     image_height: u32,
     last_rendered: std::time::Instant,
@@ -66,7 +68,9 @@ impl Application {
         Self {
             image_state: ImageState::new(),
             images: HashMap::new(),
-            pixels: None,
+            canvas: None,
+            surface: None,
+            window: None,
             image_width: 800,
             image_height: 800,
             last_rendered: std::time::Instant::now(),
@@ -77,24 +81,25 @@ impl Application {
 impl ApplicationHandler for Application {
     fn resumed(& mut self, event_loop: &ActiveEventLoop) {
         let window_attr = WindowAttributes::default()
-            .with_inner_size(PhysicalSize::new(800,800))
+            .with_inner_size(PhysicalSize::new(self.image_width, self.image_height))
             .with_title("JourneyMap Viewer");
         let window = event_loop
             .create_window(window_attr)
             .expect("Failed to create window");
-
-        let window_size = window.inner_size();
-        let pixels = Pixels::new(
-            self.image_width,
-            self.image_height,
-            SurfaceTexture::new(window_size.width, window_size.height, window),
-        ).expect("Pixels creation failed");
-
         self.load_images().expect("Failed to load images");
+        let window_rc = Rc::new(window);
 
-        self.pixels = Some(Arc::new(Mutex::new(pixels)));
-        self.render().expect("Failed to render");
 
+        let canvas = Pixmap::new(self.image_width, self.image_height).unwrap();
+        let context = Context::new(window_rc.clone()).unwrap();
+        let surface = Surface::new(&context, window_rc.clone()).unwrap();
+        self.window = Some(window_rc);
+        self.surface = Some(surface);
+
+
+
+
+        self.canvas = Some(canvas);
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
@@ -121,14 +126,29 @@ impl ApplicationHandler for Application {
                 if self.image_state.dragging {
                     self.image_state.offset_x -= dx;
                     self.image_state.offset_y -= dy;   // Y軸は上下逆
-                    // self.request_render();
-                    self.render().expect("Failed to render");
+                    self.window.as_ref().unwrap().request_redraw();
                 }
                 self.image_state.last_mouse_x = position.x;
                 self.image_state.last_mouse_y = position.y;
             }
             WindowEvent::RedrawRequested => {
-                self.render().expect("Failed to render");
+                {
+                    self.render().expect("Failed to render");
+                }
+
+                let surface = self.surface.as_mut().unwrap();
+
+                surface.resize(NonZeroU32::new(self.image_width).unwrap(), NonZeroU32::new(self.image_height).unwrap()).expect("aaaaahhhh");
+                let mut buffer = surface.buffer_mut().unwrap();
+                let data = self.canvas.as_ref().unwrap().data();
+                for index in 0..(self.image_width * self.image_height) as usize {
+                    buffer[index] =
+                        data[index * 4 + 2] as u32
+                            | (data[index * 4 + 1] as u32) << 8
+                            | (data[index * 4 + 0] as u32) << 16;
+                }
+                buffer.present().unwrap();
+
             }
             WindowEvent::MouseWheel {
                 delta,
@@ -141,7 +161,7 @@ impl ApplicationHandler for Application {
                         } else {
                             self.image_state.zoom = self.image_state.zoom / 1.1;
                         }
-                        self.render().expect("Failed to render");
+                        self.window.as_mut().unwrap().request_redraw();
                     }
                     _ => {}
                 }
@@ -154,7 +174,7 @@ impl ApplicationHandler for Application {
 
 impl Application {
     fn load_images(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let mut reader = journeymap::JourneyMapReader::new("/home/okayu/.local/share/ModrinthApp/profiles/Fabulously Optimized/journeymap/data/mp/160~251~235~246/");
+        let mut reader = JourneyMapReader::new("/home/okayu/.local/share/ModrinthApp/profiles/Fabulously Optimized/journeymap/data/mp/160~251~235~246/");
         let region_offset_x = 0;
         let region_offset_z = 0;
 
@@ -184,9 +204,9 @@ impl Application {
         Ok(())
     }
 
-    fn buffer_region(region: &mut Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> Vec<RGB> {
-
-        let mut image_data = vec![RGB::default(); 512 * 512];
+    fn buffer_region(region: &mut Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> Pixmap {
+        let mut pixmap = Pixmap::new(512, 512).unwrap();
+        let mut image_data = pixmap.pixels_mut();
         for i in 0..=31 {
             for j in 0..=31 {
                 let chunk_result = JourneyMapReader::get_chunk(region, i, j);
@@ -209,17 +229,17 @@ impl Application {
                         let i = (pixel_y * 512 + pixel_x) as usize;
 
                         // iが画像内に入るなら色を設定
-                        if i < image_data.len() {
+                        if i < 512 * 512 {
                             let color = biome::get_color(&data.biome_name);
-                            image_data[i] = color;
-
                             // Grid
-                            image_data[i] =
+                            let color: Color =
                                 if pixel_x % 16 == 0 || pixel_y % 16 == 0 {
-                                    color.blend(&RGB::new(255, 255, 255), 0.8)
+                                    color.blend(&RGB::new(255, 255, 255), 0.8).into()
                                 } else {
-                                    color
+                                    color.into()
                                 };
+
+                            image_data[i] = color.premultiply().to_color_u8()
                         }
                     }
                 } else {
@@ -228,21 +248,16 @@ impl Application {
                 }
             }
         }
-        image_data
+        pixmap
     }
 
     fn render(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if self.pixels.is_some() && self.last_rendered.elapsed().as_millis() > 1000 / 30 {
-            self.last_rendered = std::time::Instant::now();
-        } else {
-            return Ok(());  // 30fpsになるように制御
-        }
+        let pixmap = self.canvas.as_mut().unwrap();
         {
-            let mut binding = self.pixels.as_ref().unwrap().lock().unwrap();
-            let frame = binding.frame_mut();
+            // 黒でクリア
+            pixmap.fill(Color::BLACK);
 
-            // フレームをクリア
-            frame.fill(0);
+            let paint = tiny_skia::PixmapPaint::default();
 
             // 映る範囲を計算
             let left = self.image_state.offset_x as i32;
@@ -260,32 +275,12 @@ impl Application {
                         continue;
                     }
                     let image_data = self.images.get(&key).unwrap();
-                    for x in 0..512 {
-                        for y in 0..512 {
-                            if x < 0 || x >= 512 || y < 0 || y >= 512 {
-                                continue;
-                            }
-                            let ori_idx = (y * 512 + x) as usize;  // もとの画像データのインデックス
-                            let color = image_data[ori_idx];
-                            let dest_x = x + rx * 512 - JourneyMapReader::positive_modulo(left, 512);
-                            let dest_y = y + rz * 512 - JourneyMapReader::positive_modulo(top, 512);
-                            let dest_x = (dest_x as f32 * self.image_state.zoom) as i32;
-                            let dest_y = (dest_y as f32 * self.image_state.zoom) as i32;
-                            if dest_x < 0 || dest_x >= self.image_width as i32 || dest_y < 0 || dest_y >= self.image_height as i32 {
-                                continue;
-                            }
-                            let dest_idx = (dest_y * self.image_width as i32 + dest_x) as usize;  // 表示する画像データのインデックス
-                            frame[dest_idx * 4] = color.r;
-                            frame[dest_idx * 4 + 1] = color.g;
-                            frame[dest_idx * 4 + 2] = color.b;
-                            frame[dest_idx * 4 + 3] = 255;
-                        }
-                    }
+                    let dest_x = rx * 512 - JourneyMapReader::positive_modulo(left, 512);
+                    let dest_y = rz * 512 - JourneyMapReader::positive_modulo(top, 512);
+                    pixmap.draw_pixmap(dest_x, dest_y, image_data.as_ref(), &paint, Transform::default(), None)
                 }
             }
-            binding.render().unwrap();
         }
-
 
 
         Ok(())
