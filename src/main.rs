@@ -5,7 +5,8 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::num::NonZeroU32;
 use std::rc::Rc;
-use tiny_skia::{Color, Pixmap, Rect, Stroke, Transform};
+use rusttype::{point, Font, OutlineBuilder, Scale};
+use tiny_skia::{Color, Path, PathBuilder, Pixmap, Rect, Stroke, Transform};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
@@ -69,6 +70,8 @@ struct Application {
     width: u32,
     height: u32,
     edit_mode: EditMode,
+    editable: bool,
+    font: Font<'static>,
 }
 
 impl Application {
@@ -82,6 +85,8 @@ impl Application {
             width: 800,
             height: 800,
             edit_mode: EditMode::View,
+            editable: false,
+            font: Font::try_from_bytes(include_bytes!("../fonts/NotoSansJP-Regular.ttf") as &[u8]).unwrap(),
         }
     }
 }
@@ -325,6 +330,76 @@ impl Application {
             }
         }
 
+        // テキストの描画
+        Self::draw_text(pixmap, &self.font, Scale::uniform(16.0), rusttype::point(0.0, 0.0), "Hello, world!");
+
+
         Ok(())
+    }
+
+
+    fn draw_text(pixmap: &mut Pixmap, font: &Font, scale: Scale, start: rusttype::Point<f32>, text: &str) {
+        // Paintの設定
+        let paint = tiny_skia::Paint {
+            shader: tiny_skia::Shader::SolidColor(Color::from_rgba8(0, 128, 0, 255)), // 緑色のテキスト
+            ..Default::default()
+        };
+
+        // ベースラインの位置を計算
+        let v_metrics = font.v_metrics(scale);
+        let offset = start.y + v_metrics.ascent;
+
+        // グリフのレイアウトを計算
+        let glyphs: Vec<_> = font.layout(text, scale, point(start.x, offset)).collect();
+
+        for glyph in glyphs {
+            let mut path = GriffPathBuilder::new();
+            let pos = glyph.position();
+            if glyph.build_outline(&mut path) {
+                let path = path.unwrap();
+                let bounds = path.bounds();
+                let path = path.transform(Transform::from_translate(pos.x, pos.y - bounds.height())).unwrap();
+                pixmap.fill_path(&path, &paint, tiny_skia::FillRule::Winding, Transform::identity(), None);
+            }
+        }
+    }
+}
+
+struct GriffPathBuilder {
+    path_builder: PathBuilder,
+}
+
+// OutlineBuilderトレイトを実装するための実装。単純にラッピングしてるだけっていうねｗ
+impl OutlineBuilder for GriffPathBuilder {
+    fn move_to(&mut self, x: f32, y: f32) {
+        self.path_builder.move_to(x, y);
+    }
+
+    fn line_to(&mut self, x: f32, y: f32) {
+        self.path_builder.line_to(x, y);
+    }
+
+    fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
+        self.path_builder.quad_to(x1, y1, x, y);
+    }
+
+    fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
+        self.path_builder.cubic_to(x1, y1, x2, y2, x, y);
+    }
+
+    fn close(&mut self) {
+        self.path_builder.close();
+    }
+}
+
+impl GriffPathBuilder {
+    fn new() -> Self {
+        Self {
+            path_builder: PathBuilder::new(),
+        }
+    }
+
+    fn unwrap(self) -> Path {
+        self.path_builder.finish().unwrap()
     }
 }
