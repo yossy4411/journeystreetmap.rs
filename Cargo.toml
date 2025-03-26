@@ -11,7 +11,7 @@ winit = "0.30"
 tiny-skia = "0.11.4"
 softbuffer = "0.4.6"
 rusttype = "0.9.3"
-egui-winit = "0.31.1"
+fltk = "1.5.5"
 
 [lib]
 name = "journeystreetmap"
@@ -20,3 +20,4 @@ path = "src/lib.rs"
 [[bin]]
 name = "journeystreetmap-editor"
 path = "src/main.rs"
+
