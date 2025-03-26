@@ -9,7 +9,7 @@ use rusttype::{point, Font, OutlineBuilder, Scale};
 use tiny_skia::{Color, Path, PathBuilder, Pixmap, Point, Rect, Stroke, Transform};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
-use winit::event::{ElementState, WindowEvent};
+use winit::event::{ElementState, MouseButton, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowAttributes, WindowId};
@@ -148,31 +148,48 @@ impl ApplicationHandler for Application {
                 button,
                 ..
             } => {
-                if button == winit::event::MouseButton::Left {
-                    if self.editable && state == ElementState::Pressed {
-                        if self.edit_mode == EditingMode::Insert {
-                            let x = (self.image_state.last_mouse_x - self.image_state.offset_x) / self.image_state.zoom;
-                            let y = (self.image_state.last_mouse_y - self.image_state.offset_y) / self.image_state.zoom;
-                            if self.editing_type == EditingType::Poi {
-                                // todo 新しいウィンドウを開いてタグを入力する
-                                // winitで全部やるのは面倒すぎて死ぬやつ
-                                // 容量が小さくて使い勝手がいいやつ。
-                                // あと使い捨てになるし、ウィンドウで入力した情報が戻り値として返ってくるやつがいいネ
-                                // → GitHub Copilotによると、eguiが適してるって
-
-                            } else {
-                                if self.path.len() > 0 {
-                                    self.path.line_to(x, y);
-                                } else {
-                                    self.path.move_to(x, y);
+                if self.editable {
+                    if state == ElementState::Pressed {
+                        if button == MouseButton::Right && self.edit_mode == EditingMode::Insert {
+                            // 右クリックって、パス閉じるのか、それとも1個前のポイントに戻るのか。どっちがいいかな？
+                            // → 1個前のポイントに戻るのがいいかな
+                            if let Some(path) = self.path.clone().finish() {
+                                self.path = PathBuilder::new();
+                                let poi = path.points();
+                                if let Some(poi) = poi.first() {
+                                    self.path.move_to(poi.x, poi.y);
+                                }
+                                for i in 1..poi.len() - 1 {
+                                    self.path.line_to(poi[i].x, poi[i].y);
                                 }
                                 self.window.as_ref().unwrap().request_redraw();
                             }
+                        } else if button == MouseButton::Left {
+                            if self.edit_mode == EditingMode::Insert {
+                                let x = (self.image_state.last_mouse_x - self.image_state.offset_x) / self.image_state.zoom;
+                                let y = (self.image_state.last_mouse_y - self.image_state.offset_y) / self.image_state.zoom;
+                                let x = x.round();  // ブロックの位置に丸める
+                                let y = y.round();
+                                if self.editing_type == EditingType::Poi {
+                                    // todo 新しいウィンドウを開いてタグを入力する
+                                    // winitで全部やるのは面倒すぎて死ぬ
+                                    // 容量が小さくて使い勝手がいいやつ。
+                                    // あと使い捨てになるし、ウィンドウで入力した情報が戻り値として返ってくるやつがいいネ
+                                    // → GitHub Copilotによると、eguiが適してるって
+
+                                } else {
+                                    if self.path.len() > 0 {
+                                        self.path.line_to(x, y);
+                                    } else {
+                                        self.path.move_to(x, y);
+                                    }
+                                    self.window.as_ref().unwrap().request_redraw();
+                                }
+                            }
                         }
-                    } else {
-                        self.image_state.dragging = state == winit::event::ElementState::Pressed;
                     }
                 }
+                self.image_state.dragging = !self.editable && button == MouseButton::Left && state == ElementState::Pressed;
             }
             WindowEvent::CursorMoved {
                 position,
