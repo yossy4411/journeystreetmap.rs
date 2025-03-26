@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::num::NonZeroU32;
 use std::rc::Rc;
+use fltk::prelude::{GroupExt, InputExt, MenuExt, WidgetBase, WidgetExt};
 use rusttype::{point, Font, OutlineBuilder, Scale};
 use tiny_skia::{Color, Path, PathBuilder, Pixmap, Point, Rect, Stroke, Transform};
 use winit::application::ApplicationHandler;
@@ -178,6 +179,54 @@ impl ApplicationHandler for Application {
                                     // 容量が小さくて使い勝手がいいやつ。
                                     // あと使い捨てになるし、ウィンドウで入力した情報が戻り値として返ってくるやつがいいネ
                                     // → GitHub Copilotによると、eguiが適してるって
+                                    // 結果的にfltk-rsを使うことにしたyo
+
+                                    let mut app = fltk::app::App::default();
+                                    let mut wind = fltk::window::Window::new(100, 100, 400, 600, "地点の追加");
+                                    let mut frame = fltk::frame::Frame::new(0, 0, 400, 200, "地点の追加");
+
+                                    let mut flex = fltk::group::Flex::new(0, 300, 400, 300, "");
+                                    let mut name = fltk::input::Input::new(0, 0, 200, 20, "名前");
+                                    let mut desc = fltk::input::Input::new(0, 0, 200, 20, "説明");
+                                    let mut category = fltk::menu::Choice::new(0, 0, 200, 20, "カテゴリ");
+                                    category.add_choice("都市");
+                                    category.add_choice("モニュメント");
+                                    category.add_choice("交差点");
+                                    category.add_choice("建物 - 住宅");
+                                    category.add_choice("建物 - 商業");
+                                    category.add_choice("建物 - 農業");
+                                    category.add_choice("建物 - 工業");
+                                    category.add_choice("建物 - 公共施設");
+                                    category.add_choice("建物 - その他");
+                                    category.add_choice("駅 - 鉄道");  // = トロッコ
+                                    category.add_choice("駅 - バス");  // マイクラにバスはねーだろ
+                                    category.add_choice("駅 - 船");   // マイクラに自動で動く船はねーだろ
+                                    category.add_choice("駅 - 飛行機");  // マイクラに飛行機はねーだろ  ← v1.22でガストに乗れるようになったので実現可能
+                                    category.add_choice("駅 - 地下鉄");  // 地下のトロッコ
+                                    category.add_choice("採掘場");
+                                    category.add_choice("洞窟");
+                                    category.add_choice("海底神殿");
+                                    category.add_choice("遺跡");
+                                    category.add_choice("ダンジョン");
+                                    category.add_choice("要塞");
+                                    category.add_choice("砂漠の村");
+                                    category.add_choice("草原の村");
+                                    category.add_choice("雪の村");
+                                    category.add_choice("サバンナの村");
+                                    category.add_choice("ジャングルの村");   // 普通は生成されない
+                                    category.add_choice("沼の村");         // 普通は生成されない
+                                    category.add_choice("タイガの村");
+                                    flex.end();
+                                    let mut but = fltk::button::Button::new(160, 210, 80, 40, "追加");
+                                    wind.end();
+                                    wind.show();
+                                    but.set_callback(move |_| {
+                                        wind.deactivate();
+                                        app.quit();
+                                    });
+                                    app.run().unwrap();
+                                    self.editable = false;  // 誤審防止
+                                    println!("Name: {}", name.value());
 
                                 } else {
                                     if self.path.len() > 0 {
