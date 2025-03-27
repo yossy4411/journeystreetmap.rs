@@ -192,37 +192,98 @@ impl ApplicationHandler for Application {
                                         let mut name = fltk::input::Input::new(0, 0, 200, 20, "名前");
                                         let mut desc = fltk::input::Input::new(0, 0, 200, 20, "説明");
                                         let mut category = fltk::menu::Choice::new(0, 0, 200, 20, "カテゴリ");
-                                        category.add_choice("都市");
-                                        category.add_choice("モニュメント");
-                                        category.add_choice("交差点");
-                                        category.add_choice("建物 - 住宅");
-                                        category.add_choice("建物 - 商業");
-                                        category.add_choice("建物 - 農業");
-                                        category.add_choice("建物 - 工業");
-                                        category.add_choice("建物 - 公共施設");
-                                        category.add_choice("建物 - その他");
-                                        category.add_choice("駅 - 鉄道");  // = トロッコ
-                                        category.add_choice("駅 - バス");  // マイクラにバスはねーだろ
-                                        category.add_choice("駅 - 船");   // マイクラに自動で動く船はねーだろ
-                                        category.add_choice("駅 - 飛行機");  // マイクラに飛行機はねーだろ  ← v1.22でガストに乗れるようになったので実現可能
-                                        category.add_choice("駅 - 地下鉄");  // 地下のトロッコ
-                                        category.add_choice("採掘場");
-                                        category.add_choice("洞窟");
-                                        category.add_choice("海底神殿");
-                                        category.add_choice("遺跡");
-                                        category.add_choice("ダンジョン");
-                                        category.add_choice("要塞");
-                                        category.add_choice("砂漠の村");
-                                        category.add_choice("草原の村");
-                                        category.add_choice("雪の村");
-                                        category.add_choice("サバンナの村");
-                                        category.add_choice("ジャングルの村");   // 普通は生成されない
-                                        category.add_choice("沼の村");         // 普通は生成されない
-                                        category.add_choice("タイガの村");
+                                        // あくまでMinecraftのもののカテゴリです。
+                                        category.add_choice("自然生成の村");
+                                        category.add_choice("自然生成の村の構築物");
+                                        category.add_choice("自然生成のその他地上構造物");
+                                        category.add_choice("自然生成の地下構造物");
+                                        category.add_choice("人工的な市区町村");
+                                        category.add_choice("近代的な行政および国家機関");
+                                        category.add_choice("公共交通");
+                                        category.add_choice("公共施設");
+                                        category.add_choice("娯楽施設・観光地");
+                                        category.add_choice("地形");
+                                        category.add_choice("歴史的建造物");
+                                        category.add_choice("宗教的建造物");
+                                        category.add_choice("教育施設");
+                                        category.add_choice("商業施設");
+                                        category.add_choice("産業施設");
+                                        category.add_choice("住宅");
+                                        category.add_choice("その他");
+                                        let mut category2 = fltk::menu::Choice::new(0, 0, 200, 20, "サブカテゴリ");
+                                        category2.add_choice("まずはカテゴリを選んでください");
                                         flex.end();
                                         let mut but = fltk::button::Button::new(160, 210, 80, 40, "追加");
                                         wind.end();
                                         wind.show();
+                                        category.set_callback(move |cat| {
+                                            category2.clear();
+                                            let selections = match cat.value() {
+                                                0 => {  // 自然生成の村
+                                                    vec!["草原の村", "雪原の村", "砂漠の村", "サバンナの村", "タイガの村", "ジャングルの村", "湿地の村", "その他"]
+                                                    // ※ ジャングルと湿地は自然生成されない
+                                                }
+                                                1 => {  // 自然生成の村の構築物
+                                                    vec!["村", "村の広場", "村の家", "村の農場", "村の鍛冶屋", "村の神殿", "村の道", "その他"]
+                                                }
+                                                2 => {  // 自然生成のその他地上構造物
+                                                    vec!["森の洋館", "ジャングルの神殿", "ピラミッド", "ピリジャーの前哨基地", "ウィッチの小屋",
+                                                         "荒廃したポータル",
+                                                         "海底神殿", "海底遺跡", "海底の廃墟", "難破船", "埋もれた宝",
+                                                         "イグルー", "井戸",
+                                                         "その他"]
+                                                }
+                                                // note: 旅路の遺跡って地下なのか地上なのか、微妙だよね
+                                                3 => { // 自然生成の地下構造物
+                                                    vec!["廃坑", "古代都市", "遺跡", "その他"]
+                                                }
+                                                4 => { // 人工的な市区町村
+                                                    vec!["市役所", "区役所", "町役場", "村役場", "その他"]
+                                                }
+                                                5 => { // 近代的な行政および国家機関
+                                                    vec!["国会議事堂", "首相官邸", "大統領官邸", "領事館", "その他"]
+                                                }
+                                                6 => { // 公共交通
+                                                    vec!["鉄道駅", "地下鉄駅", "バス停", "路面電車停留所", "空港", "港", "その他"]
+                                                }
+                                                7 => { // 公共施設
+                                                    vec!["図書館", "美術館", "博物館", "劇場", "コンサートホール", "体育館", "プール", "その他"]
+                                                }
+                                                8 => { // 娯楽施設・観光地
+                                                    vec!["テーマパーク", "動物園", "水族館", "遊園地", "アート", "博物館", "美術館", "コンサートホール", "その他"]
+                                                }
+                                                9 => { // 地形
+                                                    vec!["山", "丘", "谷", "川", "湖", "滝", "洞窟", "花畑", "氷河", "その他"]
+                                                }
+                                                10 => { // 歴史的建造物
+                                                    vec!["その他"]
+                                                    // いや冷静に考えてマイクラに歴史的建造物ってあるのか？
+                                                }
+                                                11 => { // 宗教的建造物
+                                                    vec!["神社", "寺院", "教会", "モスク", "推しの宗教", "その他"]
+                                                    // あくまで建築物のカテゴリなので、実際の宗教とは関係ない
+                                                }
+                                                12 => { // 教育施設
+                                                    vec!["学校", "大学", "図書館", "育成所", "その他"]
+                                                }
+                                                13 => { // 商業施設
+                                                    vec!["商店", "ショッピングモール", "市場 (交易所)", "その他"]
+                                                }
+                                                14 => { // 産業施設
+                                                    vec!["工場", "倉庫", "採掘場", "農場", "牧場", "トラップ", "その他"]
+                                                }
+                                                15 => { // 住宅
+                                                    vec!["アパート", "マンション", "一戸建て", "別荘", "その他"]
+                                                }
+                                                _ => { // その他 (or 間違った番号)
+                                                    vec!["不明なもの", "未確認", "都市伝説", "その他"]
+                                                    // 都市伝説とか怖すぎるわｗ
+                                                }
+                                            };
+                                            for selection in selections {
+                                                category2.add_choice(selection);
+                                            }
+                                        });
                                         but.set_callback(move |_| {
                                             // まじウィンドウ閉じないのどうにかしてほしい
                                             // Waylandのせいかも。X11なら閉れるんちゃう？
