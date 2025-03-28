@@ -1387,6 +1387,7 @@ dependencies = [
  "fltk",
  "iced",
  "iced_tiny_skia",
+ "iced_wgpu",
  "serde",
  "tiny-skia",
 ]

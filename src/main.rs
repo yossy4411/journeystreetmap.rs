@@ -54,7 +54,7 @@ struct Application {
 
 impl Default for Application {
     fn default() -> Self {
-        let mut viewer = JourneyMapViewer::new();
+        let mut viewer = JourneyMapViewer::default();
         viewer.load_images().expect("Failed to load images");
         Self {
             journey_map_viewer: viewer,
