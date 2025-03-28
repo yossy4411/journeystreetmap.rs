@@ -1,20 +1,16 @@
-use std::collections::HashMap;
-use std::fs::File;
 use fastanvil::Region;
 use fltk::prelude::{GroupExt, InputExt, MenuExt, WidgetBase, WidgetExt};
-use iced::widget::canvas::{Event, Geometry, Image, Path, Stroke};
-use iced::widget::canvas;
-use iced::{mouse, Theme, Vector};
 use iced::event::Status;
-use iced::mouse::Interaction;
-use iced_tiny_skia::core::layout::{Limits, Node};
+use iced::widget::canvas;
+use iced::widget::canvas::{Event, Geometry, Image, Path, Stroke};
+use iced::{mouse, Theme, Vector};
 use iced_tiny_skia::core::mouse::Cursor;
-use iced_tiny_skia::core::widget::Tree;
-use iced_tiny_skia::core::{border, renderer, Color, Element, Layout, Length, Point, Rectangle, Size, Widget};
+use iced_tiny_skia::core::{renderer, Color, Point, Rectangle, Widget};
 use iced_tiny_skia::Renderer;
-use rusttype::Scale;
-use tiny_skia::Pixmap;
 use journeystreetmap::journeymap::{biome, JourneyMapReader};
+use std::collections::HashMap;
+use std::fs::File;
+use tiny_skia::Pixmap;
 
 enum Message {
 

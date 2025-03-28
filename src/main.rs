@@ -1,20 +1,9 @@
 mod map;
 
-use fastanvil::Region;
-use journeystreetmap::journeymap::{biome, JourneyMapReader};
-use softbuffer::{Context, Surface};
-use crate::map::{JourneyMapViewer};
-use std::collections::HashMap;
-use std::fs::File;
-use std::num::NonZeroU32;
-use std::rc::Rc;
-use fltk::prelude::{GroupExt, InputExt, MenuExt, WidgetBase, WidgetExt};
+use crate::map::JourneyMapViewer;
+use iced::widget::Canvas;
 use iced::Element;
-use iced::widget::{text, Canvas, Column};
-use iced_tiny_skia::core::{Image, Widget};
-use iced_tiny_skia::Renderer;
-use rusttype::{point, Font, OutlineBuilder, Scale};
-use tiny_skia::{Color, FillRule, Path, PathBuilder, Pixmap, Point, Rect, Stroke, Transform};
+use tiny_skia::{Path, Point};
 
 fn main() {
     iced::run("A cool counter", Application::update, Application::view).expect("Failed to run the application");
