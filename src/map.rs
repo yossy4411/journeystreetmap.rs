@@ -63,9 +63,8 @@ enum EditingType {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct JourneyMapViewer {
-    cache: canvas::Cache,
     images: HashMap<(i32, i32), Image>,  // Regionごとの画像データをキャッシュするためのHashMap
 }
 
@@ -78,11 +77,10 @@ pub struct JourneyMapViewerState {
     path: Vec<(f32, f32)>,
 }
 
-impl<Message> canvas::Program<Message> for JourneyMapViewer
-where Renderer: renderer::Renderer
+impl<Message> canvas::Program<Message, Theme, iced_wgpu::Renderer> for JourneyMapViewer
 {
     type State = JourneyMapViewerState;
-    fn update(&self, state: &mut Self::State, event: Event, _bounds: Rectangle, _cursor: Cursor) -> (Status, Option<Message>) {
+    fn update(&self, state: &mut Self::State, event: Event, _bounds: Rectangle, cursor: Cursor) -> (Status, Option<Message>) {
         match event {
             Event::Mouse(mouse) => {
                 match mouse {
@@ -91,6 +89,7 @@ where Renderer: renderer::Renderer
                             // 右クリックって、パス閉じるのか、それとも1個前のポイントに戻るのか。どっちがいいかな？
                             // → 1個前のポイントに戻るのがいいかな
                         } else if button == mouse::Button::Left {
+                            state.image_state.dragging = true;
                             if state.edit_mode == EditingMode::Insert {
                                 let x = (state.image_state.last_mouse_x - state.image_state.offset_x) / state.image_state.zoom;
                                 let y = (state.image_state.last_mouse_y - state.image_state.offset_y) / state.image_state.zoom;
@@ -224,20 +223,26 @@ where Renderer: renderer::Renderer
                         }
 
                     }
+                    mouse::Event::ButtonReleased(button) => {
+                        if button == mouse::Button::Left {
+                            state.image_state.dragging = false;
+                        }
+                    }
+                    mouse::Event::CursorMoved { position } => {
+                        let dx = position.x - state.image_state.last_mouse_x;
+                        let dy = position.y - state.image_state.last_mouse_y;
+                        if state.image_state.dragging {
+                            state.image_state.offset_x += dx;
+                            state.image_state.offset_y += dy;   // Y軸は上下逆
+                        }
+                        state.image_state.last_mouse_x = position.x;
+                        state.image_state.last_mouse_y = position.y;
+                    }
                     _ => {}
                 };
             }
             _ => {}
         };
-        let mut result = false;
-        if let Event::Mouse(mouse) = event {
-            if let mouse::Event::ButtonPressed(button) = mouse {
-                if button == mouse::Button::Left {
-                    result = true;
-                }
-            }
-        }
-        state.image_state.dragging = result;
         (Status::Captured, None)
     }
 
@@ -286,12 +291,6 @@ where Renderer: renderer::Renderer
 }
 
 impl JourneyMapViewer {
-    pub(crate) fn new() -> Self {
-        Self {
-            cache: canvas::Cache::new(),
-            images: HashMap::new(),
-        }
-    }
     pub fn load_images(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut reader = JourneyMapReader::new("/home/okayu/.local/share/ModrinthApp/profiles/Fabulously Optimized/journeymap/data/mp/160~251~235~246/");
         let region_offset_x = 0;
