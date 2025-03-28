@@ -1,28 +1,24 @@
-
+mod map;
 
 use fastanvil::Region;
 use journeystreetmap::journeymap::{biome, JourneyMapReader};
 use softbuffer::{Context, Surface};
+use crate::map::journey_map_viewer;
 use std::collections::HashMap;
 use std::fs::File;
 use std::num::NonZeroU32;
 use std::rc::Rc;
 use fltk::prelude::{GroupExt, InputExt, MenuExt, WidgetBase, WidgetExt};
+use iced::{Element, Theme};
+use iced::widget::{self, center, text, Column, Container};
+use iced::window::Id;
+use iced_tiny_skia::core::{Image, Widget};
+use iced_tiny_skia::Renderer;
 use rusttype::{point, Font, OutlineBuilder, Scale};
-use tiny_skia::{Color, Path, PathBuilder, Pixmap, Point, Rect, Stroke, Transform};
-use winit::application::ApplicationHandler;
-use winit::dpi::PhysicalSize;
-use winit::event::{ElementState, MouseButton, WindowEvent};
-use winit::event_loop::ActiveEventLoop;
-use winit::keyboard::{Key, NamedKey};
-use winit::window::{Window, WindowAttributes, WindowId};
+use tiny_skia::{Color, FillRule, Path, PathBuilder, Pixmap, Point, Rect, Stroke, Transform};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let event_loop = winit::event_loop::EventLoop::new();
-    let mut app = Application::new();
-    event_loop.unwrap().run_app(&mut app)?;
-
-    Ok(())
+fn main() -> iced::Result {
+    iced::run("A cool counter", Application::update, Application::view)
 }
 
 
@@ -35,6 +31,11 @@ struct ImageState {
     dragging: bool,
     last_mouse_x: f32,
     last_mouse_y: f32,
+}
+
+#[derive(Debug, Clone)]
+enum Message {
+
 }
 
 impl ImageState {
@@ -82,13 +83,10 @@ enum EditResult {
     PoiPoint(Point),
 }
 
-
 struct Application {
     image_state: ImageState,
     images: HashMap<(i32, i32), Pixmap>,  // Regionごとの画像データをキャッシュするためのHashMap
-    canvas: Option<Pixmap>,
-    surface: Option<Surface<Rc<Window>, Rc<Window>>>,
-    window: Option<Rc<Window>>,
+    canvas: Pixmap,
     width: u32,
     height: u32,
     edit_mode: EditingMode,
@@ -98,14 +96,12 @@ struct Application {
     path: PathBuilder,
 }
 
-impl Application {
-    fn new() -> Self {
+impl Default for Application {
+    fn default() -> Self {
         Self {
             image_state: ImageState::new(),
             images: HashMap::new(),
-            canvas: None,
-            surface: None,
-            window: None,
+            canvas: Pixmap::new(256, 256).unwrap(),
             width: 800,
             height: 800,
             edit_mode: EditingMode::View,
@@ -117,6 +113,18 @@ impl Application {
     }
 }
 
+impl Application {
+    pub fn update(&mut self, message: Message) {
+        // ここにアプリケーションの状態を更新する処理を書く
+    }
+
+    fn view(&self) -> Element<Message> {
+        Column::new().push(journey_map_viewer()).push(text!("Hello World!")).into()
+    }
+}
+
+
+/*
 impl ApplicationHandler for Application {
     fn resumed(& mut self, event_loop: &ActiveEventLoop) {
         let window_attr = WindowAttributes::default()
@@ -126,6 +134,10 @@ impl ApplicationHandler for Application {
             .create_window(window_attr)
             .expect("Failed to create window");
         self.load_images().expect("Failed to load images");
+
+        let state = State::new(&app, Id::unique(), &window);
+        self.iced = Some(state);
+
         let window_rc = Rc::new(window);
 
 
@@ -134,9 +146,6 @@ impl ApplicationHandler for Application {
         let surface = Surface::new(&context, window_rc.clone()).unwrap();
         self.window = Some(window_rc);
         self.surface = Some(surface);
-
-
-
 
         self.canvas = Some(canvas);
     }
@@ -346,6 +355,8 @@ impl ApplicationHandler for Application {
                 }
             }
             WindowEvent::RedrawRequested => {
+                let window_rc = Rc::clone(self.window.as_ref().unwrap());
+                self.iced.as_mut().unwrap().update(&window_rc, &event, &mut iced_winit::runtime::Debug::default());
                 self.render().expect("Failed to render");
 
                 let surface = self.surface.as_mut().unwrap();
@@ -656,3 +667,4 @@ impl GriffPathBuilder {
         self.path_builder.finish().unwrap()
     }
 }
+*/
