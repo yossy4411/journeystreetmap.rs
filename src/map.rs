@@ -1,11 +1,12 @@
+use iced::widget::canvas::Geometry;
+use iced::widget::canvas;
+use iced::Theme;
 use iced_tiny_skia::core::layout::{Limits, Node};
 use iced_tiny_skia::core::mouse::Cursor;
-use iced_tiny_skia::core::renderer::Style;
 use iced_tiny_skia::core::widget::Tree;
-use iced_tiny_skia::core::{border, renderer, Background, Color, Element, Layout, Length, Point, Rectangle, Size, Widget};
-use iced_tiny_skia::graphics::Viewport;
+use iced_tiny_skia::core::{border, renderer, Color, Element, Layout, Length, Point, Rectangle, Size, Widget};
 use iced_tiny_skia::Renderer;
-use tiny_skia::{Mask, PathBuilder, Pixmap, Stroke, Transform};
+use tiny_skia::{PathBuilder, Pixmap, Stroke, Transform};
 
 enum Message {
 
@@ -21,53 +22,37 @@ pub fn journey_map_viewer() -> JourneyMapViewer {
 }
 
 
-impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer> for JourneyMapViewer
+
+impl<Message> canvas::Program<Message> for JourneyMapViewer
 where Renderer: renderer::Renderer
 {
-    fn size(&self) -> Size<Length> {
-        Size::new(Length::Shrink, Length::Shrink)
-    }
+    type State = ();
+    fn draw(&self, state: &Self::State, renderer: &iced::Renderer, theme: &Theme, bounds: Rectangle, cursor: Cursor) -> Vec<Geometry<iced::Renderer>> {
 
-    fn layout(&self, tree: &mut Tree, renderer: &Renderer, limits: &Limits) -> Node {
-        Node::new(Size::new(200.0, 200.0))
-    }
+        let geom = self.cache.draw(renderer, bounds.size(), |a| {
+            let mut pixmap = Pixmap::new(200, 200).unwrap();
+            pixmap.fill(tiny_skia::Color::WHITE);
+            let mut path = PathBuilder::new();
+            // 三角形
+            path.move_to(100.0, 40.0);
+            path.line_to(150.0, 180.0);
+            path.line_to(50.0, 180.0);
+            path.close();
+            let path = path.finish().unwrap();
 
-    fn draw(&self, tree: &Tree, renderer: &mut Renderer, theme: &Theme, style: &Style, layout: Layout<'_>, cursor: Cursor, viewport: &Rectangle) {
-        let mut pixmap = Pixmap::new(200, 200).unwrap();
-        pixmap.fill(tiny_skia::Color::WHITE);
-        self.cache.draw(renderer, viewport.size(), |a| {
-
+            let mut paint = tiny_skia::Paint::default();
+            paint.set_color(tiny_skia::Color::from_rgba8(0, 0, 0, 255));
+            pixmap.stroke_path(&path, &paint, &Stroke{width: 6.0, ..Default::default()}, Transform::identity(), None);
+            let image = iced_tiny_skia::core::image::Handle::from_rgba(
+                200,
+                200,
+                pixmap.data().to_vec(),
+            );
+            a.fill_rectangle(bounds.position(), bounds.size(), Color::WHITE);
+            a.draw_image(Rectangle::with_size(Size::new(200.0, 200.0)), iced_tiny_skia::core::Image::new(image));
         });
-        let mut path = PathBuilder::new();
-        // 三角形
-        path.move_to(100.0, 0.0);
-        path.line_to(200.0, 200.0);
-        path.line_to(0.0, 200.0);
-        path.close();
-        let path = path.finish().unwrap();
 
-        let mut paint = tiny_skia::Paint::default();
-        paint.set_color(tiny_skia::Color::from_rgba8(0, 0, 0, 255));
-        pixmap.stroke_path(&path, &paint, &Stroke{width: 6.0, ..Default::default()}, Transform::identity(), None);
-        renderer.draw::<String>(
-            &mut pixmap.as_mut(),
-            &mut Mask::new(200, 200).unwrap(),
-            &Viewport::with_physical_size(Size::new(200, 200), 1.0),
-            &[layout.bounds()],
-            Color::BLACK,
-            &[]
-        )
-
-    }
-}
-
-
-impl<Message, Theme> From<JourneyMapViewer>
-for Element<'_, Message, Theme, Renderer>
-where Renderer: renderer::Renderer,
-{
-    fn from(viewer: JourneyMapViewer) -> Self {
-        Self::new(viewer)
+        vec![geom]
     }
 }
 

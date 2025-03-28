@@ -10,7 +10,7 @@ use std::num::NonZeroU32;
 use std::rc::Rc;
 use fltk::prelude::{GroupExt, InputExt, MenuExt, WidgetBase, WidgetExt};
 use iced::Element;
-use iced::widget::{text, Column};
+use iced::widget::{text, Canvas, Column};
 use iced_tiny_skia::core::{Image, Widget};
 use iced_tiny_skia::Renderer;
 use rusttype::{point, Font, OutlineBuilder, Scale};
@@ -119,7 +119,7 @@ impl Application {
 
     fn view(&self) -> Element<Message> {
         // Column::new().push(journey_map_viewer()).push(text!("Hello World!")).into()
-        iced::widget::column![circle(5.0), journey_map_viewer()].into()
+        iced::widget::column![circle(5.0), Canvas::new(journey_map_viewer())].into()
     }
 }
 
