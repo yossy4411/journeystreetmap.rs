@@ -241,6 +241,20 @@ impl<Message> canvas::Program<Message, Theme, iced_wgpu::Renderer> for JourneyMa
                         }
 
                     }
+                    mouse::Event::WheelScrolled { delta } => {
+                        match delta {
+                            mouse::ScrollDelta::Lines { x:_, y } => {
+                                let factor = if y > 0.0 { state.image_state.zoom_factor } else { 1.0 / state.image_state.zoom_factor };
+                                state.image_state.zoom *= factor;
+
+                                let zoom_origin_x = state.image_state.last_mouse_x;
+                                let zoom_origin_y = state.image_state.last_mouse_y;
+                                state.image_state.offset_x = (state.image_state.offset_x - zoom_origin_x) * factor + zoom_origin_x;
+                                state.image_state.offset_y = (state.image_state.offset_y - zoom_origin_y) * factor + zoom_origin_y;
+                            }
+                            _ => {}
+                        }
+                    }
                     _ => { return (Status::Ignored, None) }
                 };
             }
@@ -258,8 +272,9 @@ impl<Message> canvas::Program<Message, Theme, iced_wgpu::Renderer> for JourneyMa
                 // この中身で描画処理を行う
                 // with_save内での変更はFnを抜けた時点で破棄される
                 // 言ったらC#でいうところのusingみたいなもの
-                frame.scale(state.image_state.zoom);
+
                 frame.translate(Vector::new(state.image_state.offset_x, state.image_state.offset_y));
+                frame.scale(state.image_state.zoom);
 
                 for ((rx, rz), img) in &self.images {
                     let dest_x = rx * 512;
