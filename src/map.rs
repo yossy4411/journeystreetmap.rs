@@ -3,18 +3,14 @@ use fltk::prelude::{GroupExt, InputExt, MenuExt, WidgetBase, WidgetExt};
 use iced::event::Status;
 use iced::widget::canvas;
 use iced::widget::canvas::{Event, Frame, Geometry, Image, Path, Stroke};
-use iced::{mouse, Theme, Vector};
-use iced_tiny_skia::core::mouse::Cursor;
-use iced_tiny_skia::core::{renderer, Color, Point, Rectangle};
-use iced_tiny_skia::Renderer;
+use iced::{mouse, Color, Point, Rectangle, Theme, Vector};
 use journeystreetmap::journeymap::{biome, JourneyMapReader};
 use std::collections::HashMap;
 use std::fs::File;
+use iced::mouse::Cursor;
+use iced_wgpu::core::image::Handle;
+use iced_wgpu::graphics::geometry::Cache;
 use tiny_skia::Pixmap;
-
-enum Message {
-
-}
 
 
 #[derive(Debug, Clone)]
@@ -66,6 +62,7 @@ enum EditingType {
 #[derive(Debug, Default)]
 pub struct JourneyMapViewer {
     images: HashMap<(i32, i32), Image>,  // Regionごとの画像データをキャッシュするためのHashMap
+    cache: Cache<iced_wgpu::Renderer>
 }
 
 #[derive(Debug, Default)]
@@ -80,7 +77,7 @@ pub struct JourneyMapViewerState {
 impl<Message> canvas::Program<Message, Theme, iced_wgpu::Renderer> for JourneyMapViewer
 {
     type State = JourneyMapViewerState;
-    fn update(&self, state: &mut Self::State, event: Event, _bounds: Rectangle, cursor: Cursor) -> (Status, Option<Message>) {
+    fn update(&self, state: &mut Self::State, event: Event, _bounds: Rectangle, _: Cursor) -> (Status, Option<Message>) {
         match event {
             Event::Mouse(mouse) => {
                 match mouse {
@@ -220,8 +217,10 @@ impl<Message> canvas::Program<Message, Theme, iced_wgpu::Renderer> for JourneyMa
                                     state.path.push((x, y));
                                 }
                             }
+                        } else {
+                            state.image_state.dragging = false;
+                            return (Status::Ignored, None);
                         }
-
                     }
                     mouse::Event::ButtonReleased(button) => {
                         if button == mouse::Button::Left {
@@ -231,62 +230,67 @@ impl<Message> canvas::Program<Message, Theme, iced_wgpu::Renderer> for JourneyMa
                     mouse::Event::CursorMoved { position } => {
                         let dx = position.x - state.image_state.last_mouse_x;
                         let dy = position.y - state.image_state.last_mouse_y;
+                        state.image_state.last_mouse_x = position.x;
+                        state.image_state.last_mouse_y = position.y;
+
                         if state.image_state.dragging {
                             state.image_state.offset_x += dx;
                             state.image_state.offset_y += dy;   // Y軸は上下逆
+                        } else {
+                            return (Status::Ignored, None);
                         }
-                        state.image_state.last_mouse_x = position.x;
-                        state.image_state.last_mouse_y = position.y;
+
                     }
-                    _ => {}
+                    _ => { return (Status::Ignored, None) }
                 };
             }
             _ => {}
         };
+        self.cache.clear();
         (Status::Captured, None)
     }
 
     fn draw(&self, state: &Self::State, renderer: &iced::Renderer, theme: &Theme, bounds: Rectangle, cursor: Cursor) -> Vec<Geometry<iced::Renderer>> {
-        let timestamp = std::time::Instant::now();
-        let mut f = Frame::new(renderer, bounds.size());
-        f.fill_rectangle(bounds.position(), bounds.size(), Color::WHITE);
-        f.with_save(|frame| {
-            // この中身で描画処理を行う
-            // with_save内での変更はFnを抜けた時点で破棄される
-            // 言ったらC#でいうところのusingみたいなもの
-            frame.scale(state.image_state.zoom);
-            frame.translate(Vector::new(state.image_state.offset_x, state.image_state.offset_y));
+        let geom = self.cache.draw(renderer, bounds.size(), |f| {
+            let timestamp = std::time::Instant::now();
+            f.fill_rectangle(bounds.position(), bounds.size(), Color::WHITE);
+            f.with_save(|frame| {
+                // この中身で描画処理を行う
+                // with_save内での変更はFnを抜けた時点で破棄される
+                // 言ったらC#でいうところのusingみたいなもの
+                frame.scale(state.image_state.zoom);
+                frame.translate(Vector::new(state.image_state.offset_x, state.image_state.offset_y));
 
-            for ((rx, rz), img) in &self.images {
-                let dest_x = rx * 512;
-                let dest_y = rz * 512;
-                frame.draw_image(Rectangle::new(Point::new(dest_x as f32, dest_y as f32), (512.0, 512.0).into()), img.clone());
+                for ((rx, rz), img) in &self.images {
+                    let dest_x = rx * 512;
+                    let dest_y = rz * 512;
+                    frame.draw_image(Rectangle::new(Point::new(dest_x as f32, dest_y as f32), (512.0, 512.0).into()), img.clone());
 
-                // グリッド
-                for i in 0..=32 {
-                    let x = dest_x as f32 + i as f32 * 16.0;
-                    let y = dest_y as f32 + i as f32 * 16.0;
-                    let stroke = Stroke {
-                        width: 1.0,
-                        style: canvas::Style::Solid(Color::WHITE),
-                        ..Default::default()
-                    };
-                    let path = Path::new(|builder| {
-                        builder.move_to(Point::new(x, dest_y as f32));
-                        builder.line_to(Point::new(x, dest_y as f32 + 512.0));
-                    });
-                    frame.stroke(&path, stroke);
+                    // グリッド
+                    for i in 0..=32 {
+                        let x = dest_x as f32 + i as f32 * 16.0;
+                        let y = dest_y as f32 + i as f32 * 16.0;
+                        let stroke = Stroke {
+                            width: 1.0,
+                            style: canvas::Style::Solid(Color::WHITE),
+                            ..Default::default()
+                        };
+                        let path = Path::new(|builder| {
+                            builder.move_to(Point::new(x, dest_y as f32));
+                            builder.line_to(Point::new(x, dest_y as f32 + 512.0));
+                        });
+                        frame.stroke(&path, stroke);
 
-                    let path = Path::new(|builder| {
-                        builder.move_to(Point::new(dest_x as f32, y));
-                        builder.line_to(Point::new(dest_x as f32 + 512.0, y));
-                    });
-                    frame.stroke(&path, stroke);
+                        let path = Path::new(|builder| {
+                            builder.move_to(Point::new(dest_x as f32, y));
+                            builder.line_to(Point::new(dest_x as f32 + 512.0, y));
+                        });
+                        frame.stroke(&path, stroke);
+                    }
                 }
-            }
+            });
+            println!("Rendering took {:?}", timestamp.elapsed());
         });
-        let geom = f.into_geometry();
-        println!("Rendering took {:?}", timestamp.elapsed());
         vec![geom]
     }
 }
@@ -366,7 +370,10 @@ impl JourneyMapViewer {
                 }
             }
         }
-        let handle = iced_tiny_skia::core::image::Handle::from_rgba(512, 512, pixmap.take());
+        let handle = Handle::from_rgba(512, 512, pixmap.take());
         Image::new(handle)
+    }
+
+    pub fn set_insert<Message>(&mut self, message: Message) {
     }
 }

@@ -1,7 +1,7 @@
 mod map;
 
 use crate::map::JourneyMapViewer;
-use iced::widget::Canvas;
+use iced::widget::{button, Canvas};
 use iced::Element;
 use tiny_skia::{Path, Point};
 
@@ -11,7 +11,7 @@ fn main() {
 
 #[derive(Debug, Clone)]
 enum Message {
-
+    OnButtonClick,
 }
 
 // 編集したものを保存するenum
@@ -72,6 +72,7 @@ impl Application {
         iced::widget::column![
             "JourneyMapのマップをアプリで表示する試み",
             Canvas::new(&self.journey_map_viewer),
+            button("aaaa").on_press(Message::OnButtonClick)
         ].into()
     }
 }
