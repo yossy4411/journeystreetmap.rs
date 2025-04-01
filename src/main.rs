@@ -74,10 +74,12 @@ impl Application {
         // Column::new().push(journey_map_viewer()).push(text!("Hello World!")).into()
 /*        let mut jm = JourneyMapViewer::default();
         jm.load_images().expect("Failed to load images");*/
+        let mut w = map_wgpu::MyGpuWidget::new();
+        w.load_images().expect("Failed to load images");
         iced::widget::column![
             "JourneyMapのマップをアプリで表示する試み",
             // Canvas::new(jm),
-            Element::new(map_wgpu::MyGpuWidget::new()),
+            Element::new(w),
             button("aaaa").on_press(Message::OnButtonClick)
         ].into()
     }
