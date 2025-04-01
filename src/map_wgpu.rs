@@ -4,7 +4,7 @@ use fastanvil::Region;
 use iced::mouse::Cursor;
 use iced::{border, Element, Length, Pixels, Point, Rectangle, Size, Theme};
 use iced::alignment::{Horizontal, Vertical};
-use iced::widget::canvas::Image;
+
 use iced::widget::text::Wrapping;
 use iced_wgpu::core::layout::{Limits, Node};
 use iced_wgpu::core::renderer::Style;
@@ -14,6 +14,7 @@ use iced_wgpu::core::text::Renderer;
 use iced_wgpu::core::widget::Tree;
 use iced_wgpu::graphics::geometry::{Frame, Path};
 use iced_wgpu::graphics::geometry::frame::Backend;
+use iced_wgpu::core::Image;
 use tiny_skia::Pixmap;
 use journeystreetmap::journeymap::{biome, JourneyMapReader};
 
