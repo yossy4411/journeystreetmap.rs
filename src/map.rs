@@ -10,6 +10,7 @@ use iced::widget::canvas::Cache;
 use journeystreetmap::journeymap::{biome, JourneyMapReader};
 use std::collections::HashMap;
 use std::fs::File;
+use iced_wgpu::graphics::geometry::{Frame, Renderer};
 use tiny_skia::Pixmap;
 
 
@@ -266,34 +267,35 @@ impl<Message> canvas::Program<Message, Theme, iced_wgpu::Renderer> for JourneyMa
     }
 
     fn draw(&self, state: &Self::State, renderer: &iced::Renderer, theme: &Theme, bounds: Rectangle, cursor: Cursor) -> Vec<Geometry<iced::Renderer>> {
-        let geom = self.image_layer_cache.draw(renderer, bounds.size(), |f| {
-            let timestamp = std::time::Instant::now();
+        let timestamp = std::time::Instant::now();
 
-            f.translate(Vector::new(state.image_state.offset_x, state.image_state.offset_y));
-            f.scale(state.image_state.zoom);
+        let mut f = Frame::new(renderer, bounds.size());
 
-            for ((rx, rz), img) in &self.images {
-                let dest_x = rx * 512;
-                let dest_y = rz * 512;
-                f.draw_image(Rectangle::new(Point::new(dest_x as f32, dest_y as f32), (512.0, 512.0).into()), img.clone());
-            }
-            println!("Rendering took {:?}", timestamp.elapsed());
+        f.translate(Vector::new(state.image_state.offset_x, state.image_state.offset_y));
+        f.scale(state.image_state.zoom);
+
+        // 画像を最後に描画する（グリッドの下に行かないように）
+        for ((rx, rz), img) in &self.images {
+            let dest_x = rx * 512;
+            let dest_y = rz * 512;
+            f.draw_image(Rectangle::new(Point::new(dest_x as f32, dest_y as f32), (512.0, 512.0).into()), img.clone());
+        }
+
+        // グリッド（線）を先に描画する
+        let stroke = Stroke {
+            width: 10.0,
+            style: canvas::Style::Solid(Color::from_rgba8(255, 0, 0, 1.0)),
+            ..Default::default()
+        };
+        let path = Path::new(|builder| {
+            builder.move_to(Point::new(20.0, 0.0));
+            builder.line_to(Point::new(20.0, bounds.height));
         });
+        f.stroke(&path, stroke);
 
-        let geom2 = self.fore_layer_cache.draw(renderer, bounds.size(), |f| {
-            // grid
-            let stroke = Stroke {
-                width: 10.0,
-                style: canvas::Style::Solid(Color::from_rgba8(255, 0, 0, 1.0)),
-                ..Default::default()
-            };
-            let path = Path::new(|builder| {
-                builder.move_to(Point::new(20.0, 0.0));
-                builder.line_to(Point::new(20.0, bounds.height));
-            });
-            f.stroke(&path, stroke);
-        });
-        vec![geom2, geom, ]
+        println!("Rendering took {:?}", timestamp.elapsed());
+
+        vec![f.into_geometry()]
     }
 }
 

@@ -1,7 +1,8 @@
 mod map;
 
+use std::sync::Arc;
 use crate::map::JourneyMapViewer;
-use iced::widget::{button, Canvas};
+use iced::widget::{button, container, Canvas};
 use iced::Element;
 use tiny_skia::{Path, Point};
 
@@ -49,16 +50,17 @@ impl Default for ImageState {
 }
 
 struct Application {
-    journey_map_viewer: JourneyMapViewer,
+    // journey_map_viewer: Arc<JourneyMapViewer>,
 }
 
 impl Default for Application {
     fn default() -> Self {
-        let mut viewer = JourneyMapViewer::default();
+/*        let mut viewer = JourneyMapViewer::default();
         viewer.load_images().expect("Failed to load images");
         Self {
-            journey_map_viewer: viewer,
-        }
+            journey_map_viewer: Arc::new(viewer),
+        }*/
+        Self{}
     }
 }
 
@@ -69,9 +71,11 @@ impl Application {
 
     fn view(&self) -> Element<Message> {
         // Column::new().push(journey_map_viewer()).push(text!("Hello World!")).into()
+        let mut jm = JourneyMapViewer::default();
+        jm.load_images().expect("Failed to load images");
         iced::widget::column![
             "JourneyMapのマップをアプリで表示する試み",
-            Canvas::new(&self.journey_map_viewer),
+            container(Canvas::new(jm)),
             button("aaaa").on_press(Message::OnButtonClick)
         ].into()
     }
