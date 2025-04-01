@@ -1,15 +1,15 @@
 use fastanvil::Region;
 use fltk::prelude::{GroupExt, InputExt, MenuExt, WidgetBase, WidgetExt};
 use iced::event::Status;
+use iced::mouse::Cursor;
 use iced::widget::canvas;
-use iced::widget::canvas::{Event, Frame, Geometry, Image, Path, Stroke};
+use iced::widget::canvas::{Event, Geometry, Image, Path, Stroke};
 use iced::{mouse, Color, Point, Rectangle, Theme, Vector};
+use iced_wgpu::core::image::Handle;
+use iced::widget::canvas::Cache;
 use journeystreetmap::journeymap::{biome, JourneyMapReader};
 use std::collections::HashMap;
 use std::fs::File;
-use iced::mouse::Cursor;
-use iced_wgpu::core::image::Handle;
-use iced_wgpu::graphics::geometry::Cache;
 use tiny_skia::Pixmap;
 
 
@@ -62,7 +62,8 @@ enum EditingType {
 #[derive(Debug, Default)]
 pub struct JourneyMapViewer {
     images: HashMap<(i32, i32), Image>,  // Regionごとの画像データをキャッシュするためのHashMap
-    cache: Cache<iced_wgpu::Renderer>
+    image_layer_cache: Cache<iced_wgpu::Renderer>,
+    fore_layer_cache: Cache<iced_wgpu::Renderer>,
 }
 
 #[derive(Debug, Default)]
@@ -260,53 +261,39 @@ impl<Message> canvas::Program<Message, Theme, iced_wgpu::Renderer> for JourneyMa
             }
             _ => {}
         };
-        self.cache.clear();
+        self.image_layer_cache.clear();
         (Status::Captured, None)
     }
 
     fn draw(&self, state: &Self::State, renderer: &iced::Renderer, theme: &Theme, bounds: Rectangle, cursor: Cursor) -> Vec<Geometry<iced::Renderer>> {
-        let geom = self.cache.draw(renderer, bounds.size(), |f| {
+        let geom = self.image_layer_cache.draw(renderer, bounds.size(), |f| {
             let timestamp = std::time::Instant::now();
-            f.fill_rectangle(bounds.position(), bounds.size(), Color::WHITE);
-            f.with_save(|frame| {
-                // この中身で描画処理を行う
-                // with_save内での変更はFnを抜けた時点で破棄される
-                // 言ったらC#でいうところのusingみたいなもの
 
-                frame.translate(Vector::new(state.image_state.offset_x, state.image_state.offset_y));
-                frame.scale(state.image_state.zoom);
+            f.translate(Vector::new(state.image_state.offset_x, state.image_state.offset_y));
+            f.scale(state.image_state.zoom);
 
-                for ((rx, rz), img) in &self.images {
-                    let dest_x = rx * 512;
-                    let dest_y = rz * 512;
-                    frame.draw_image(Rectangle::new(Point::new(dest_x as f32, dest_y as f32), (512.0, 512.0).into()), img.clone());
-
-                    // グリッド
-                    for i in 0..=32 {
-                        let x = dest_x as f32 + i as f32 * 16.0;
-                        let y = dest_y as f32 + i as f32 * 16.0;
-                        let stroke = Stroke {
-                            width: 1.0,
-                            style: canvas::Style::Solid(Color::WHITE),
-                            ..Default::default()
-                        };
-                        let path = Path::new(|builder| {
-                            builder.move_to(Point::new(x, dest_y as f32));
-                            builder.line_to(Point::new(x, dest_y as f32 + 512.0));
-                        });
-                        frame.stroke(&path, stroke);
-
-                        let path = Path::new(|builder| {
-                            builder.move_to(Point::new(dest_x as f32, y));
-                            builder.line_to(Point::new(dest_x as f32 + 512.0, y));
-                        });
-                        frame.stroke(&path, stroke);
-                    }
-                }
-            });
+            for ((rx, rz), img) in &self.images {
+                let dest_x = rx * 512;
+                let dest_y = rz * 512;
+                f.draw_image(Rectangle::new(Point::new(dest_x as f32, dest_y as f32), (512.0, 512.0).into()), img.clone());
+            }
             println!("Rendering took {:?}", timestamp.elapsed());
         });
-        vec![geom]
+
+        let geom2 = self.fore_layer_cache.draw(renderer, bounds.size(), |f| {
+            // grid
+            let stroke = Stroke {
+                width: 10.0,
+                style: canvas::Style::Solid(Color::from_rgba8(255, 0, 0, 1.0)),
+                ..Default::default()
+            };
+            let path = Path::new(|builder| {
+                builder.move_to(Point::new(20.0, 0.0));
+                builder.line_to(Point::new(20.0, bounds.height));
+            });
+            f.stroke(&path, stroke);
+        });
+        vec![geom2, geom, ]
     }
 }
 
