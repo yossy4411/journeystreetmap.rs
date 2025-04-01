@@ -1,4 +1,5 @@
 mod map;
+mod map_wgpu;
 
 use std::sync::Arc;
 use crate::map::JourneyMapViewer;
@@ -71,11 +72,12 @@ impl Application {
 
     fn view(&self) -> Element<Message> {
         // Column::new().push(journey_map_viewer()).push(text!("Hello World!")).into()
-        let mut jm = JourneyMapViewer::default();
-        jm.load_images().expect("Failed to load images");
+/*        let mut jm = JourneyMapViewer::default();
+        jm.load_images().expect("Failed to load images");*/
         iced::widget::column![
             "JourneyMapのマップをアプリで表示する試み",
-            container(Canvas::new(jm)),
+            // Canvas::new(jm),
+            Element::new(map_wgpu::MyGpuWidget::new()),
             button("aaaa").on_press(Message::OnButtonClick)
         ].into()
     }
