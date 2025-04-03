@@ -1,17 +1,18 @@
 use fastanvil::Region;
 use fltk::prelude::{GroupExt, InputExt, MenuExt, WidgetBase, WidgetExt};
-use iced::mouse::Cursor;
-use iced::{Color, Length, Point, Rectangle, Size, Theme, Vector};
+use iced::mouse::{Cursor, Interaction};
+use iced::{mouse, Color, Event, Length, Point, Rectangle, Size, Theme, Vector};
 use iced_wgpu::core::image::Handle;
 use iced_wgpu::core::layout::{Limits, Node};
 use iced_wgpu::core::renderer::Style;
 use iced_wgpu::core::widget::Tree;
-use iced_wgpu::core::{Image, Layout, Widget};
+use iced_wgpu::core::{Clipboard, Element, Image, Layout, Shell, Widget};
 use iced_wgpu::graphics::geometry::{stroke, Cache, Path, Renderer, Stroke};
 use journeystreetmap::journeymap::{biome, JourneyMapReader};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::fs::File;
+use iced::event::Status;
 use tiny_skia::Pixmap;
 
 
@@ -65,7 +66,7 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer {
     images: HashMap<(i32, i32), Image>,  // Regionごとの画像データをキャッシュするためのHashMap
     image_layer_cache: Cache<Renderer>,
     fore_layer_cache: Cache<Renderer>,
-    image_state: ImageState,
+    state: JourneyMapViewerState,
 }
 
 impl<Renderer> Debug for JourneyMapViewer<Renderer>
@@ -76,7 +77,7 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer {
             .field("images", &self.images)
             .field("image_layer_cache", &c)  // note: CacheはDebugトレイトを実装していない
             .field("fore_layer_cache", &c)
-            .field("image_state", &self.image_state)
+            .field("image_state", &self.state)
             .finish()
     }
 }
@@ -86,9 +87,9 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer {
     fn default() -> Self {
         Self {
             images: HashMap::new(),
-            image_layer_cache: Cache::default(),
-            fore_layer_cache: Cache::default(),
-            image_state: ImageState::default(),
+            image_layer_cache: Cache::new(),
+            fore_layer_cache: Cache::new(),
+            state: JourneyMapViewerState::default(),
         }
     }
 }
@@ -113,22 +114,63 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer
         Node::new(Size::new(512.0, 512.0)) // レイアウトノードのサイズ
     }
 
-    /* fn update(&self, state: &mut Self::State, event: Event, _bounds: Rectangle, _: Cursor) -> (Status, Option<Message>) {
+    fn draw(&self, tree: &Tree, renderer: &mut Renderer, theme: &Theme, style: &Style, layout: Layout<'_>, cursor: Cursor, viewport: &Rectangle) {
+        let timestamp = std::time::Instant::now();
+
+        let geom1 = self.image_layer_cache.draw(renderer, layout.bounds().size(), |f| {
+            f.translate(Vector::new(self.state.image_state.offset_x, self.state.image_state.offset_y));
+            f.scale(self.state.image_state.zoom);
+
+            // 画像を最後に描画する（グリッドの下に行かないように）
+            for ((rx, rz), img) in &self.images {
+                let dest_x = rx * 512;
+                let dest_y = rz * 512;
+                f.draw_image(Rectangle::new(Point::new(dest_x as f32, dest_y as f32), (512.0, 512.0).into()), img.clone());
+            }
+        });
+
+        let geom2 = self.fore_layer_cache.draw(renderer, layout.bounds().size(), |f| {
+            // グリッド（今は適当に線）を先に描画する
+            let stroke = Stroke {
+                width: 10.0,
+                style: stroke::Style::Solid(Color::from_rgba8(255, 0, 0, 1.0)),
+                ..Default::default()
+            };
+            let path = Path::new(|builder| {
+                builder.move_to(Point::new(20.0, 0.0));
+                builder.line_to(Point::new(20.0, layout.bounds().height));
+            });
+            f.stroke(&path, stroke);
+        });
+
+
+
+        println!("Rendering took {:?}", timestamp.elapsed());
+
+        renderer.with_layer(layout.bounds(), |r| {
+            r.draw_geometry(geom1);
+        });
+        renderer.with_layer(layout.bounds(), |r| {
+            r.draw_geometry(geom2);
+        });
+    }
+
+    fn on_event(&mut self, _state: &mut Tree, event: Event, _layout: Layout<'_>, _cursor: Cursor, _renderer: &Renderer, _clipboard: &mut dyn Clipboard, _shell: &mut Shell<'_, Message>, _viewport: &Rectangle) -> Status {
         match event {
             Event::Mouse(mouse) => {
                 match mouse {
                     mouse::Event::ButtonPressed(button) => {
-                        if button == mouse::Button::Right && state.edit_mode == EditingMode::Insert {
+                        if button == mouse::Button::Right && self.state.edit_mode == EditingMode::Insert {
                             // 右クリックって、パス閉じるのか、それとも1個前のポイントに戻るのか。どっちがいいかな？
                             // → 1個前のポイントに戻るのがいいかな
                         } else if button == mouse::Button::Left {
-                            state.image_state.dragging = true;
-                            if state.edit_mode == EditingMode::Insert {
-                                let x = (state.image_state.last_mouse_x - state.image_state.offset_x) / state.image_state.zoom;
-                                let y = (state.image_state.last_mouse_y - state.image_state.offset_y) / state.image_state.zoom;
+                            self.state.image_state.dragging = true;
+                            if self.state.edit_mode == EditingMode::Insert {
+                                let x = (self.state.image_state.last_mouse_x - self.state.image_state.offset_x) / self.state.image_state.zoom;
+                                let y = (self.state.image_state.last_mouse_y - self.state.image_state.offset_y) / self.state.image_state.zoom;
                                 let x = x.round();  // ブロックの位置に丸める
                                 let y = y.round();
-                                if state.editing_type == EditingType::Poi {
+                                if self.state.editing_type == EditingType::Poi {
                                     // todo 新しいウィンドウを開いてタグを入力する
                                     // winitで全部やるのは面倒すぎて死ぬ
                                     // 容量が小さくて使い勝手がいいやつ。
@@ -246,99 +288,58 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer
                                         app.run().unwrap();
                                         name.value()
                                     };
-                                    state.editable = false;  // 誤審防止
+                                    self.state.editable = false;  // 誤審防止
                                     println!("Name: {}", result);
 
                                 } else {
-                                    state.path.push((x, y));
+                                    self.state.path.push((x, y));
                                 }
                             }
                         } else {
-                            state.image_state.dragging = false;
-                            return (Status::Ignored, None);
+                            self.state.image_state.dragging = false;
+                            return Status::Ignored;
                         }
                     }
                     mouse::Event::ButtonReleased(button) => {
                         if button == mouse::Button::Left {
-                            state.image_state.dragging = false;
+                            self.state.image_state.dragging = false;
                         }
                     }
                     mouse::Event::CursorMoved { position } => {
-                        let dx = position.x - state.image_state.last_mouse_x;
-                        let dy = position.y - state.image_state.last_mouse_y;
-                        state.image_state.last_mouse_x = position.x;
-                        state.image_state.last_mouse_y = position.y;
+                        let dx = position.x - self.state.image_state.last_mouse_x;
+                        let dy = position.y - self.state.image_state.last_mouse_y;
+                        self.state.image_state.last_mouse_x = position.x;
+                        self.state.image_state.last_mouse_y = position.y;
 
-                        if state.image_state.dragging {
-                            state.image_state.offset_x += dx;
-                            state.image_state.offset_y += dy;   // Y軸は上下逆
+                        if self.state.image_state.dragging {
+                            self.state.image_state.offset_x += dx;
+                            self.state.image_state.offset_y += dy;   // Y軸は上下逆
                         } else {
-                            return (Status::Ignored, None);
+                            return Status::Ignored
                         }
 
                     }
                     mouse::Event::WheelScrolled { delta } => {
                         match delta {
                             mouse::ScrollDelta::Lines { x:_, y } => {
-                                let factor = if y > 0.0 { state.image_state.zoom_factor } else { 1.0 / state.image_state.zoom_factor };
-                                state.image_state.zoom *= factor;
+                                let factor = if y > 0.0 { self.state.image_state.zoom_factor } else { 1.0 / self.state.image_state.zoom_factor };
+                                self.state.image_state.zoom *= factor;
 
-                                let zoom_origin_x = state.image_state.last_mouse_x;
-                                let zoom_origin_y = state.image_state.last_mouse_y;
-                                state.image_state.offset_x = (state.image_state.offset_x - zoom_origin_x) * factor + zoom_origin_x;
-                                state.image_state.offset_y = (state.image_state.offset_y - zoom_origin_y) * factor + zoom_origin_y;
+                                let zoom_origin_x = self.state.image_state.last_mouse_x;
+                                let zoom_origin_y = self.state.image_state.last_mouse_y;
+                                self.state.image_state.offset_x = (self.state.image_state.offset_x - zoom_origin_x) * factor + zoom_origin_x;
+                                self.state.image_state.offset_y = (self.state.image_state.offset_y - zoom_origin_y) * factor + zoom_origin_y;
                             }
                             _ => {}
                         }
                     }
-                    _ => { return (Status::Ignored, None) }
+                    _ => { return Status::Ignored }
                 };
             }
             _ => {}
         };
         self.image_layer_cache.clear();
-        (Status::Captured, None)
-    }*/
-
-    fn draw(&self, tree: &Tree, renderer: &mut Renderer, theme: &Theme, style: &Style, layout: Layout<'_>, cursor: Cursor, viewport: &Rectangle) {
-        let timestamp = std::time::Instant::now();
-
-        let geom1 = self.image_layer_cache.draw(renderer, layout.bounds().size(), |f| {
-            f.translate(Vector::new(self.image_state.offset_x, self.image_state.offset_y));
-            f.scale(self.image_state.zoom);
-
-            // 画像を最後に描画する（グリッドの下に行かないように）
-            for ((rx, rz), img) in &self.images {
-                let dest_x = rx * 512;
-                let dest_y = rz * 512;
-                f.draw_image(Rectangle::new(Point::new(dest_x as f32, dest_y as f32), (512.0, 512.0).into()), img.clone());
-            }
-        });
-
-        let geom2 = self.fore_layer_cache.draw(renderer, layout.bounds().size(), |f| {
-            // グリッド（今は適当に線）を先に描画する
-            let stroke = Stroke {
-                width: 10.0,
-                style: stroke::Style::Solid(Color::from_rgba8(255, 0, 0, 1.0)),
-                ..Default::default()
-            };
-            let path = Path::new(|builder| {
-                builder.move_to(Point::new(20.0, 0.0));
-                builder.line_to(Point::new(20.0, layout.bounds().height));
-            });
-            f.stroke(&path, stroke);
-        });
-
-
-
-        println!("Rendering took {:?}", timestamp.elapsed());
-
-        renderer.with_layer(layout.bounds(), |r| {
-            r.draw_geometry(geom1);
-        });
-        renderer.with_layer(layout.bounds(), |r| {
-            r.draw_geometry(geom2);
-        });
+        return Status::Captured;
     }
 }
 
@@ -423,5 +424,12 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer {
     }
 
     pub fn set_insert<Message>(&mut self, message: Message) {
+    }
+}
+
+impl<'a, Message, Renderer> From<JourneyMapViewer<Renderer>> for Element<'a, Message, Theme, Renderer>
+where Renderer: iced_wgpu::graphics::geometry::Renderer + 'a {
+    fn from(v: JourneyMapViewer<Renderer>) -> Self {
+        Self::new(v)
     }
 }

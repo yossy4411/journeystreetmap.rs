@@ -78,7 +78,7 @@ impl Application {
         iced::widget::column![
             "JourneyMapのマップをアプリで表示する試み",
             // Canvas::new(jm),
-            Element::new(w),
+            w,
             button("aaaa").on_press(Message::OnButtonClick)
         ].into()
     }
