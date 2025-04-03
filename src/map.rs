@@ -7,7 +7,7 @@ use iced_wgpu::core::image::Handle;
 use iced_wgpu::core::layout::{Limits, Node};
 use iced_wgpu::core::renderer::Style;
 use iced_wgpu::core::widget::Tree;
-use iced_wgpu::core::{Clipboard, Element, Image, Layout, Shell, Widget};
+use iced_wgpu::core::{keyboard, Clipboard, Element, Image, Layout, Shell, Widget};
 use iced_wgpu::graphics::geometry::{stroke, Cache, Path, Stroke};
 use journeystreetmap::journeymap::{biome, JourneyMapReader};
 use std::collections::HashMap;
@@ -290,7 +290,6 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer
                                     };
                                     self.state.editable = false;  // 誤審防止
                                     println!("Name: {}", result);
-
                                 } else {
                                     self.state.path.push((x, y));
                                 }
@@ -317,11 +316,10 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer
                         } else {
                             return Status::Ignored
                         }
-
                     }
                     mouse::Event::WheelScrolled { delta } => {
                         match delta {
-                            mouse::ScrollDelta::Lines { x:_, y } => {
+                            mouse::ScrollDelta::Lines { x: _, y } => {
                                 let factor = if y > 0.0 { self.state.image_state.zoom_factor } else { 1.0 / self.state.image_state.zoom_factor };
                                 self.state.image_state.zoom *= factor;
 
@@ -334,10 +332,63 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer
                         }
                     }
                     _ => { return Status::Ignored }
-                };
+                }
             }
-            _ => {}
-        };
+            Event::Keyboard(key) => {
+                match key {
+                    keyboard::Event::KeyPressed { key, .. } => {
+                        match key {
+                            keyboard::Key::Character(n) => {
+                                match n.to_uppercase().as_str() {
+                                    "I" => {
+                                        self.state.edit_mode = EditingMode::Insert;
+                                        println!("Insert mode");
+                                    }
+                                    "D" => {
+                                        self.state.edit_mode = EditingMode::Delete;
+                                        println!("Delete mode");
+                                    }
+                                    "S" => {
+                                        self.state.edit_mode = EditingMode::Select;
+                                        println!("Select mode");
+                                    }
+                                    "V" => {
+                                        self.state.edit_mode = EditingMode::View;
+                                        println!("View mode");
+                                    }
+                                    "E" => {
+                                        // 編集対象を周期的に切り替える
+                                        self.state.editing_type = match self.state.editing_type {
+                                            EditingType::Stroke => EditingType::Fill,
+                                            EditingType::Fill => EditingType::Poi,
+                                            EditingType::Poi => EditingType::Stroke,
+                                        };
+                                    }
+                                    _ => {
+                                        println!("Key pressed: {}", n);
+                                    }
+                                }
+                            }
+                            keyboard::Key::Named(name) => {
+                                if name == keyboard::key::Named::Shift {
+                                    self.state.editable = true;
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    keyboard::Event::KeyReleased { key, .. } => {
+                        if let keyboard::Key::Named(name) = key {
+                            if name == keyboard::key::Named::Shift {
+                                self.state.editable = false;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            _ => { return Status::Ignored; }
+        }
         self.image_layer_cache.clear();
         return Status::Captured;
     }
