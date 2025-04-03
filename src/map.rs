@@ -1,18 +1,18 @@
 use fastanvil::Region;
 use fltk::prelude::{GroupExt, InputExt, MenuExt, WidgetBase, WidgetExt};
-use iced::mouse::{Cursor, Interaction};
+use iced::event::Status;
+use iced::mouse::Cursor;
 use iced::{mouse, Color, Event, Length, Point, Rectangle, Size, Theme, Vector};
 use iced_wgpu::core::image::Handle;
 use iced_wgpu::core::layout::{Limits, Node};
 use iced_wgpu::core::renderer::Style;
 use iced_wgpu::core::widget::Tree;
 use iced_wgpu::core::{Clipboard, Element, Image, Layout, Shell, Widget};
-use iced_wgpu::graphics::geometry::{stroke, Cache, Path, Renderer, Stroke};
+use iced_wgpu::graphics::geometry::{stroke, Cache, Path, Stroke};
 use journeystreetmap::journeymap::{biome, JourneyMapReader};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::fs::File;
-use iced::event::Status;
 use tiny_skia::Pixmap;
 
 
@@ -110,11 +110,11 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer
         Size::new(Length::Shrink, Length::Shrink)
     }
 
-    fn layout(&self, tree: &mut Tree, renderer: &Renderer, limits: &Limits) -> Node {
+    fn layout(&self, _tree: &mut Tree, _renderer: &Renderer, _limits: &Limits) -> Node {
         Node::new(Size::new(512.0, 512.0)) // レイアウトノードのサイズ
     }
 
-    fn draw(&self, tree: &Tree, renderer: &mut Renderer, theme: &Theme, style: &Style, layout: Layout<'_>, cursor: Cursor, viewport: &Rectangle) {
+    fn draw(&self, _tree: &Tree, renderer: &mut Renderer, _theme: &Theme, _style: &Style, layout: Layout<'_>, _cursor: Cursor, _viewport: &Rectangle) {
         let timestamp = std::time::Instant::now();
 
         let geom1 = self.image_layer_cache.draw(renderer, layout.bounds().size(), |f| {
@@ -179,13 +179,13 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer
                                     // 結果的にfltk-rsを使うことにしたyo
 
                                     let result = {
-                                        let mut app = fltk::app::App::default();
+                                        let app = fltk::app::App::default();
                                         let mut wind = fltk::window::Window::new(100, 100, 400, 600, "地点の追加");
-                                        let mut frame = fltk::frame::Frame::new(0, 0, 400, 200, "地点の追加");
+                                        let _ = fltk::frame::Frame::new(0, 0, 400, 200, "地点の追加");
 
-                                        let mut flex = fltk::group::Flex::new(0, 300, 400, 300, "");
-                                        let mut name = fltk::input::Input::new(0, 0, 200, 20, "名前");
-                                        let mut desc = fltk::input::Input::new(0, 0, 200, 20, "説明");
+                                        let flex = fltk::group::Flex::new(0, 300, 400, 300, "");
+                                        let name = fltk::input::Input::new(0, 0, 200, 20, "名前");
+                                        let _ = fltk::input::Input::new(0, 0, 200, 20, "説明");
                                         let mut category = fltk::menu::Choice::new(0, 0, 200, 20, "カテゴリ");
                                         // あくまでMinecraftのもののカテゴリです。
                                         category.add_choice("自然生成の村");
@@ -353,7 +353,7 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer {
         let stopwatch = std::time::Instant::now();
 
         let mut threads = Vec::new();
-        let mut regions = // reader.get_regions_list();
+        let regions = // reader.get_regions_list();
             [(-1, -1), (0, -1), (1, -1), (-1, 0), (0, 0), (1, 0), (-1, 1), (0, 1), (1, 1)];
 
         for (i, (region_x, region_z)) in regions.into_iter().enumerate() {
@@ -421,9 +421,6 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer {
         }
         let handle = Handle::from_rgba(512, 512, pixmap.take());
         Image::new(handle)
-    }
-
-    pub fn set_insert<Message>(&mut self, message: Message) {
     }
 }
 
