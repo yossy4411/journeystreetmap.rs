@@ -4,6 +4,7 @@ mod map_wgpu;
 use iced::widget::button;
 use iced::Element;
 use tiny_skia::{Path, Point};
+use crate::map::JourneyMapViewer;
 
 fn main() {
     iced::run("A cool counter", Application::update, Application::view).expect("Failed to run the application");
@@ -72,7 +73,7 @@ impl Application {
         // Column::new().push(journey_map_viewer()).push(text!("Hello World!")).into()
 /*        let mut jm = JourneyMapViewer::default();
         jm.load_images().expect("Failed to load images");*/
-        let mut w = map::JourneyMapViewer::default();
+        let mut w = JourneyMapViewer::default();
         w.load_images().expect("Failed to load images");
         iced::widget::column![
             "JourneyMapのマップをアプリで表示する試み",

@@ -7,9 +7,10 @@ use iced_wgpu::core::layout::{Limits, Node};
 use iced_wgpu::core::renderer::Style;
 use iced_wgpu::core::widget::Tree;
 use iced_wgpu::core::{Image, Layout, Widget};
-use iced_wgpu::graphics::geometry::{stroke, Cache, Frame, Path, Renderer, Stroke};
+use iced_wgpu::graphics::geometry::{stroke, Cache, Path, Renderer, Stroke};
 use journeystreetmap::journeymap::{biome, JourneyMapReader};
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 use std::fs::File;
 use tiny_skia::Pixmap;
 
@@ -59,13 +60,37 @@ enum EditingType {
     Poi,    // ポイント（村、都市、交差点...）
 }
 
-
-#[derive(Debug, Default)]
-pub struct JourneyMapViewer {
+pub struct JourneyMapViewer<Renderer>
+where Renderer: iced_wgpu::graphics::geometry::Renderer {
     images: HashMap<(i32, i32), Image>,  // Regionごとの画像データをキャッシュするためのHashMap
-    image_layer_cache: Cache<iced_wgpu::Renderer>,
-    fore_layer_cache: Cache<iced_wgpu::Renderer>,
+    image_layer_cache: Cache<Renderer>,
+    fore_layer_cache: Cache<Renderer>,
     image_state: ImageState,
+}
+
+impl<Renderer> Debug for JourneyMapViewer<Renderer>
+where Renderer: iced_wgpu::graphics::geometry::Renderer {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let c = "Cache";
+        f.debug_struct("JourneyMapViewer")
+            .field("images", &self.images)
+            .field("image_layer_cache", &c)  // note: CacheはDebugトレイトを実装していない
+            .field("fore_layer_cache", &c)
+            .field("image_state", &self.image_state)
+            .finish()
+    }
+}
+
+impl<Renderer> Default for JourneyMapViewer<Renderer>
+where Renderer: iced_wgpu::graphics::geometry::Renderer {
+    fn default() -> Self {
+        Self {
+            images: HashMap::new(),
+            image_layer_cache: Cache::default(),
+            fore_layer_cache: Cache::default(),
+            image_state: ImageState::default(),
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -77,7 +102,7 @@ pub struct JourneyMapViewerState {
     path: Vec<(f32, f32)>,
 }
 
-impl<Message, Renderer> Widget<Message, Theme, Renderer> for JourneyMapViewer
+impl<Message, Renderer> Widget<Message, Theme, Renderer> for JourneyMapViewer<Renderer>
 where Renderer: iced_wgpu::graphics::geometry::Renderer
 {
     fn size(&self) -> Size<Length> {
@@ -278,39 +303,47 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer
     fn draw(&self, tree: &Tree, renderer: &mut Renderer, theme: &Theme, style: &Style, layout: Layout<'_>, cursor: Cursor, viewport: &Rectangle) {
         let timestamp = std::time::Instant::now();
 
-        let mut f = Frame::new(renderer, layout.bounds().size());
+        let geom1 = self.image_layer_cache.draw(renderer, layout.bounds().size(), |f| {
+            f.translate(Vector::new(self.image_state.offset_x, self.image_state.offset_y));
+            f.scale(self.image_state.zoom);
 
-        f.translate(Vector::new(self.image_state.offset_x, self.image_state.offset_y));
-        f.scale(self.image_state.zoom);
-
-        // 画像を最後に描画する（グリッドの下に行かないように）
-        for ((rx, rz), img) in &self.images {
-            let dest_x = rx * 512;
-            let dest_y = rz * 512;
-            f.draw_image(Rectangle::new(Point::new(dest_x as f32, dest_y as f32), (512.0, 512.0).into()), img.clone());
-        }
-
-        // グリッド（線）を先に描画する
-        let stroke = Stroke {
-            width: 10.0,
-            style: stroke::Style::Solid(Color::from_rgba8(255, 0, 0, 1.0)),
-            ..Default::default()
-        };
-        let path = Path::new(|builder| {
-            builder.move_to(Point::new(20.0, 0.0));
-            builder.line_to(Point::new(20.0, layout.bounds().height));
+            // 画像を最後に描画する（グリッドの下に行かないように）
+            for ((rx, rz), img) in &self.images {
+                let dest_x = rx * 512;
+                let dest_y = rz * 512;
+                f.draw_image(Rectangle::new(Point::new(dest_x as f32, dest_y as f32), (512.0, 512.0).into()), img.clone());
+            }
         });
-        f.stroke(&path, stroke);
+
+        let geom2 = self.fore_layer_cache.draw(renderer, layout.bounds().size(), |f| {
+            // グリッド（今は適当に線）を先に描画する
+            let stroke = Stroke {
+                width: 10.0,
+                style: stroke::Style::Solid(Color::from_rgba8(255, 0, 0, 1.0)),
+                ..Default::default()
+            };
+            let path = Path::new(|builder| {
+                builder.move_to(Point::new(20.0, 0.0));
+                builder.line_to(Point::new(20.0, layout.bounds().height));
+            });
+            f.stroke(&path, stroke);
+        });
+
+
 
         println!("Rendering took {:?}", timestamp.elapsed());
 
-        renderer.start_layer(layout.bounds());
-        renderer.draw_geometry(f.into_geometry());
-        renderer.end_layer();
+        renderer.with_layer(layout.bounds(), |r| {
+            r.draw_geometry(geom1);
+        });
+        renderer.with_layer(layout.bounds(), |r| {
+            r.draw_geometry(geom2);
+        });
     }
 }
 
-impl JourneyMapViewer {
+impl<Renderer> JourneyMapViewer<Renderer>
+where Renderer: iced_wgpu::graphics::geometry::Renderer {
     pub fn load_images(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut reader = JourneyMapReader::new("/home/okayu/.local/share/ModrinthApp/profiles/Fabulously Optimized/journeymap/data/mp/160~251~235~246/");
         let region_offset_x = 0;
