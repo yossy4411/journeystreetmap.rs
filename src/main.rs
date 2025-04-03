@@ -1,9 +1,7 @@
 mod map;
 mod map_wgpu;
 
-use std::sync::Arc;
-use crate::map::JourneyMapViewer;
-use iced::widget::{button, container, Canvas};
+use iced::widget::button;
 use iced::Element;
 use tiny_skia::{Path, Point};
 
@@ -74,7 +72,7 @@ impl Application {
         // Column::new().push(journey_map_viewer()).push(text!("Hello World!")).into()
 /*        let mut jm = JourneyMapViewer::default();
         jm.load_images().expect("Failed to load images");*/
-        let mut w = map_wgpu::MyGpuWidget::new();
+        let mut w = map::JourneyMapViewer::default();
         w.load_images().expect("Failed to load images");
         iced::widget::column![
             "JourneyMapのマップをアプリで表示する試み",

@@ -1,16 +1,16 @@
 use fastanvil::Region;
 use fltk::prelude::{GroupExt, InputExt, MenuExt, WidgetBase, WidgetExt};
-use iced::event::Status;
 use iced::mouse::Cursor;
-use iced::widget::canvas;
-use iced::widget::canvas::{Event, Geometry, Image, Path, Stroke};
-use iced::{mouse, Color, Point, Rectangle, Theme, Vector};
+use iced::{Color, Length, Point, Rectangle, Size, Theme, Vector};
 use iced_wgpu::core::image::Handle;
-use iced::widget::canvas::Cache;
+use iced_wgpu::core::layout::{Limits, Node};
+use iced_wgpu::core::renderer::Style;
+use iced_wgpu::core::widget::Tree;
+use iced_wgpu::core::{Image, Layout, Widget};
+use iced_wgpu::graphics::geometry::{stroke, Cache, Frame, Path, Renderer, Stroke};
 use journeystreetmap::journeymap::{biome, JourneyMapReader};
 use std::collections::HashMap;
 use std::fs::File;
-use iced_wgpu::graphics::geometry::{Frame, Renderer};
 use tiny_skia::Pixmap;
 
 
@@ -65,6 +65,7 @@ pub struct JourneyMapViewer {
     images: HashMap<(i32, i32), Image>,  // Regionごとの画像データをキャッシュするためのHashMap
     image_layer_cache: Cache<iced_wgpu::Renderer>,
     fore_layer_cache: Cache<iced_wgpu::Renderer>,
+    image_state: ImageState,
 }
 
 #[derive(Debug, Default)]
@@ -76,10 +77,18 @@ pub struct JourneyMapViewerState {
     path: Vec<(f32, f32)>,
 }
 
-impl<Message> canvas::Program<Message, Theme, iced_wgpu::Renderer> for JourneyMapViewer
+impl<Message, Renderer> Widget<Message, Theme, Renderer> for JourneyMapViewer
+where Renderer: iced_wgpu::graphics::geometry::Renderer
 {
-    type State = JourneyMapViewerState;
-    fn update(&self, state: &mut Self::State, event: Event, _bounds: Rectangle, _: Cursor) -> (Status, Option<Message>) {
+    fn size(&self) -> Size<Length> {
+        Size::new(Length::Shrink, Length::Shrink)
+    }
+
+    fn layout(&self, tree: &mut Tree, renderer: &Renderer, limits: &Limits) -> Node {
+        Node::new(Size::new(512.0, 512.0)) // レイアウトノードのサイズ
+    }
+
+    /* fn update(&self, state: &mut Self::State, event: Event, _bounds: Rectangle, _: Cursor) -> (Status, Option<Message>) {
         match event {
             Event::Mouse(mouse) => {
                 match mouse {
@@ -264,15 +273,15 @@ impl<Message> canvas::Program<Message, Theme, iced_wgpu::Renderer> for JourneyMa
         };
         self.image_layer_cache.clear();
         (Status::Captured, None)
-    }
+    }*/
 
-    fn draw(&self, state: &Self::State, renderer: &iced::Renderer, theme: &Theme, bounds: Rectangle, cursor: Cursor) -> Vec<Geometry<iced::Renderer>> {
+    fn draw(&self, tree: &Tree, renderer: &mut Renderer, theme: &Theme, style: &Style, layout: Layout<'_>, cursor: Cursor, viewport: &Rectangle) {
         let timestamp = std::time::Instant::now();
 
-        let mut f = Frame::new(renderer, bounds.size());
+        let mut f = Frame::new(renderer, layout.bounds().size());
 
-        f.translate(Vector::new(state.image_state.offset_x, state.image_state.offset_y));
-        f.scale(state.image_state.zoom);
+        f.translate(Vector::new(self.image_state.offset_x, self.image_state.offset_y));
+        f.scale(self.image_state.zoom);
 
         // 画像を最後に描画する（グリッドの下に行かないように）
         for ((rx, rz), img) in &self.images {
@@ -284,18 +293,20 @@ impl<Message> canvas::Program<Message, Theme, iced_wgpu::Renderer> for JourneyMa
         // グリッド（線）を先に描画する
         let stroke = Stroke {
             width: 10.0,
-            style: canvas::Style::Solid(Color::from_rgba8(255, 0, 0, 1.0)),
+            style: stroke::Style::Solid(Color::from_rgba8(255, 0, 0, 1.0)),
             ..Default::default()
         };
         let path = Path::new(|builder| {
             builder.move_to(Point::new(20.0, 0.0));
-            builder.line_to(Point::new(20.0, bounds.height));
+            builder.line_to(Point::new(20.0, layout.bounds().height));
         });
         f.stroke(&path, stroke);
 
         println!("Rendering took {:?}", timestamp.elapsed());
 
-        vec![f.into_geometry()]
+        renderer.start_layer(layout.bounds());
+        renderer.draw_geometry(f.into_geometry());
+        renderer.end_layer();
     }
 }
 
