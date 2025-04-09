@@ -1,8 +1,8 @@
 mod map;
 
 use crate::map::JourneyMapViewer;
-use iced::widget::button;
 use iced::Element;
+use iced::widget::{row, column, button};
 
 fn main() {
     iced::run("A cool counter", Application::update, Application::view).expect("Failed to run the application");
@@ -43,8 +43,14 @@ impl Application {
         iced::widget::column![
             "JourneyMapのマップをアプリで表示する試み",
             // Canvas::new(jm),
-            w,
-            button("aaaa").on_press(Message::OnButtonClick)
+            row![
+                w,
+                column![
+                    "Hello World!",
+                    button("ボタン牡丹ぼたん").on_press(Message::OnButtonClick)
+                ],
+            ].spacing(8),
+
         ].into()
     }
 }

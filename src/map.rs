@@ -61,28 +61,26 @@ enum EditingType {
     Poi,    // ポイント（村、都市、交差点...）
 }
 
-pub struct JourneyMapViewer<Renderer>
+pub struct JourneyMapViewer<Message, Renderer>
 where Renderer: iced_wgpu::graphics::geometry::Renderer {
     images: HashMap<(i32, i32), Image>,  // Regionごとの画像データをキャッシュするためのHashMap
     image_layer_cache: Cache<Renderer>,
     fore_layer_cache: Cache<Renderer>,
+    on_press: Option<Box<dyn Fn() -> Message>>,
     state: JourneyMapViewerState,
 }
 
-impl<Renderer> Debug for JourneyMapViewer<Renderer>
+impl<Message, Renderer> Debug for JourneyMapViewer<Message, Renderer>
 where Renderer: iced_wgpu::graphics::geometry::Renderer {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let c = "Cache";
         f.debug_struct("JourneyMapViewer")
             .field("images", &self.images)
-            .field("image_layer_cache", &c)  // note: CacheはDebugトレイトを実装していない
-            .field("fore_layer_cache", &c)
             .field("image_state", &self.state)
             .finish()
     }
 }
 
-impl<Renderer> Default for JourneyMapViewer<Renderer>
+impl<Message, Renderer> Default for JourneyMapViewer<Message, Renderer>
 where Renderer: iced_wgpu::graphics::geometry::Renderer {
     fn default() -> Self {
         Self {
@@ -90,6 +88,7 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer {
             image_layer_cache: Cache::new(),
             fore_layer_cache: Cache::new(),
             state: JourneyMapViewerState::default(),
+            on_press: None,
         }
     }
 }
@@ -103,7 +102,7 @@ pub struct JourneyMapViewerState {
     path: Vec<(f32, f32)>,
 }
 
-impl<Message, Renderer> Widget<Message, Theme, Renderer> for JourneyMapViewer<Renderer>
+impl<Message, Renderer> Widget<Message, Theme, Renderer> for JourneyMapViewer<Message, Renderer>
 where Renderer: iced_wgpu::graphics::geometry::Renderer
 {
     fn size(&self) -> Size<Length> {
@@ -394,7 +393,7 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer
     }
 }
 
-impl<Renderer> JourneyMapViewer<Renderer>
+impl<Message, Renderer> JourneyMapViewer<Message, Renderer>
 where Renderer: iced_wgpu::graphics::geometry::Renderer {
     pub fn load_images(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut reader = JourneyMapReader::new("/home/okayu/.local/share/ModrinthApp/profiles/Fabulously Optimized/journeymap/data/mp/160~251~235~246/");
@@ -475,9 +474,9 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer {
     }
 }
 
-impl<'a, Message, Renderer> From<JourneyMapViewer<Renderer>> for Element<'a, Message, Theme, Renderer>
+impl<'a, Message: 'a, Renderer> From<JourneyMapViewer<Message, Renderer>> for Element<'a, Message, Theme, Renderer>
 where Renderer: iced_wgpu::graphics::geometry::Renderer + 'a {
-    fn from(v: JourneyMapViewer<Renderer>) -> Self {
+    fn from(v: JourneyMapViewer<Message, Renderer>) -> Self {
         Self::new(v)
     }
 }
