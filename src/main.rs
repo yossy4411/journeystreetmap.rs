@@ -1,6 +1,6 @@
 mod map;
 
-use crate::map::JourneyMapViewer;
+use crate::map::{JourneyMapViewer, JourneyMapViewerState};
 use iced::Element;
 use iced::widget::{row, column, button};
 
@@ -15,17 +15,16 @@ enum Message {
 
 
 struct Application {
-    // journey_map_viewer: Arc<JourneyMapViewer>,
+    journey_map_viewer_state: JourneyMapViewerState
 }
 
 impl Default for Application {
     fn default() -> Self {
-/*        let mut viewer = JourneyMapViewer::default();
-        viewer.load_images().expect("Failed to load images");
+        let mut jm_state = JourneyMapViewerState::default();
+        jm_state.load_images().expect("Failed to load images from JourneyMapViewerState");
         Self {
-            journey_map_viewer: Arc::new(viewer),
-        }*/
-        Self{}
+            journey_map_viewer_state: jm_state,
+        }
     }
 }
 
@@ -34,12 +33,11 @@ impl Application {
         // ここにアプリケーションの状態を更新する処理を書く
     }
 
-    fn view(&self) -> Element<Message> {
+    fn view(&mut self) -> Element<Message> {
         // Column::new().push(journey_map_viewer()).push(text!("Hello World!")).into()
 /*        let mut jm = JourneyMapViewer::default();
         jm.load_images().expect("Failed to load images");*/
-        let mut w = JourneyMapViewer::default();
-        w.load_images().expect("Failed to load images");
+        let mut w = JourneyMapViewer::new(&mut self.journey_map_viewer_state);
         iced::widget::column![
             "JourneyMapのマップをアプリで表示する試み",
             // Canvas::new(jm),

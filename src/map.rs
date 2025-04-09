@@ -61,33 +61,23 @@ enum EditingType {
     Poi,    // ポイント（村、都市、交差点...）
 }
 
-pub struct JourneyMapViewer<Message, Renderer>
+pub struct JourneyMapViewer<'a, Message, Renderer>
 where Renderer: iced_wgpu::graphics::geometry::Renderer {
-    images: HashMap<(i32, i32), Image>,  // Regionごとの画像データをキャッシュするためのHashMap
     image_layer_cache: Cache<Renderer>,
     fore_layer_cache: Cache<Renderer>,
     on_press: Option<Box<dyn Fn() -> Message>>,
-    state: JourneyMapViewerState,
+    state: &'a mut JourneyMapViewerState,
 }
 
-impl<Message, Renderer> Debug for JourneyMapViewer<Message, Renderer>
-where Renderer: iced_wgpu::graphics::geometry::Renderer {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("JourneyMapViewer")
-            .field("images", &self.images)
-            .field("image_state", &self.state)
-            .finish()
-    }
-}
+// todo: JourneyMpaViewerにDebugトレイトを実装する
 
-impl<Message, Renderer> Default for JourneyMapViewer<Message, Renderer>
+impl<'a, Message, Renderer> JourneyMapViewer<'a, Message, Renderer>
 where Renderer: iced_wgpu::graphics::geometry::Renderer {
-    fn default() -> Self {
+    pub fn new(state: &'a mut JourneyMapViewerState) -> Self {
         Self {
-            images: HashMap::new(),
             image_layer_cache: Cache::new(),
             fore_layer_cache: Cache::new(),
-            state: JourneyMapViewerState::default(),
+            state,
             on_press: None,
         }
     }
@@ -95,6 +85,7 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer {
 
 #[derive(Debug, Default)]
 pub struct JourneyMapViewerState {
+    images: HashMap<(i32, i32), Image>,  // Regionごとの画像データをキャッシュするためのHashMap
     image_state: ImageState,
     edit_mode: EditingMode,
     editing_type: EditingType,
@@ -102,7 +93,87 @@ pub struct JourneyMapViewerState {
     path: Vec<(f32, f32)>,
 }
 
-impl<Message, Renderer> Widget<Message, Theme, Renderer> for JourneyMapViewer<Message, Renderer>
+impl JourneyMapViewerState {
+    pub fn load_images(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let mut reader = JourneyMapReader::new("/home/okayu/.local/share/ModrinthApp/profiles/Fabulously Optimized/journeymap/data/mp/160~251~235~246/");
+        let region_offset_x = 0;
+        let region_offset_z = 0;
+
+        let stopwatch = std::time::Instant::now();
+
+        let mut threads = Vec::new();
+        let regions = // reader.get_regions_list();
+            [(-1, -1), (0, -1), (1, -1), (-1, 0), (0, 0), (1, 0), (-1, 1), (0, 1), (1, 1)];
+
+        for (i, (region_x, region_z)) in regions.into_iter().enumerate() {
+            let region = reader.try_read_region(region_offset_x + region_x, region_offset_z + region_z);
+            if let Some(mut region) = region {
+                let thr = std::thread::spawn(move || {
+                    ((region_x, region_z), Self::buffer_region(&mut region, region_offset_x, region_offset_z, region_x, region_z))
+                });
+                threads.push(thr);
+            } else {
+                println!("Region not found");
+                continue;
+            }
+            if i > 20 {
+                break;
+            }
+        }
+
+        for thr in threads {
+            let (key, content) = thr.join().unwrap();
+            self.images.insert(key, content);
+        }
+        println!("Time taken: {:?}", stopwatch.elapsed());
+        Ok(())
+    }
+
+    fn buffer_region(region: &mut Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> Image {
+        let mut pixmap = Pixmap::new(512, 512).unwrap();
+        let image_data = pixmap.pixels_mut();
+        for i in 0..=31 {
+            for j in 0..=31 {
+                let chunk_result = JourneyMapReader::get_chunk(region, i, j);
+                match chunk_result {
+                    Err(..) => {
+                        continue;
+                    }
+                    Ok(chunk) => {
+                        if chunk.is_none() {
+                            println!("Chunk not found");
+                            continue;
+                        }
+                        let chunk = chunk.unwrap();
+                        for (pos, data) in chunk.sections {
+                            let mut splited = pos.split(',');
+                            let x: i32 = splited.next().unwrap().parse().unwrap();
+                            let z: i32 = splited.next().unwrap().parse().unwrap();
+
+                            // ブロック座標をリージョン内の相対座標に変換
+                            let pixel_x = x - 512 * (region_offset_x + region_x);
+                            let pixel_y = z - 512 * (region_offset_z + region_z);
+
+                            // RGBA配列のインデックスを計算
+                            let i = (pixel_y * 512 + pixel_x) as usize;
+
+                            // iが画像内に入るなら色を設定
+                            if i < 512 * 512 {
+                                let color = biome::get_color(&data.biome_name);
+                                let color: tiny_skia::Color = color.into();
+                                image_data[i] = color.premultiply().to_color_u8()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let handle = Handle::from_rgba(512, 512, pixmap.take());
+        Image::new(handle)
+    }
+}
+
+impl<Message, Renderer> Widget<Message, Theme, Renderer> for JourneyMapViewer<'_, Message, Renderer>
 where Renderer: iced_wgpu::graphics::geometry::Renderer
 {
     fn size(&self) -> Size<Length> {
@@ -121,7 +192,7 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer
             f.scale(self.state.image_state.zoom);
 
             // 画像を最後に描画する（グリッドの下に行かないように）
-            for ((rx, rz), img) in &self.images {
+            for ((rx, rz), img) in &self.state.images {
                 let dest_x = rx * 512;
                 let dest_y = rz * 512;
                 f.draw_image(Rectangle::new(Point::new(dest_x as f32, dest_y as f32), (512.0, 512.0).into()), img.clone());
@@ -393,90 +464,12 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer
     }
 }
 
-impl<Message, Renderer> JourneyMapViewer<Message, Renderer>
-where Renderer: iced_wgpu::graphics::geometry::Renderer {
-    pub fn load_images(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let mut reader = JourneyMapReader::new("/home/okayu/.local/share/ModrinthApp/profiles/Fabulously Optimized/journeymap/data/mp/160~251~235~246/");
-        let region_offset_x = 0;
-        let region_offset_z = 0;
+impl<Message, Renderer> JourneyMapViewer<'_, Message, Renderer>
+where Renderer: iced_wgpu::graphics::geometry::Renderer {}
 
-        let stopwatch = std::time::Instant::now();
-
-        let mut threads = Vec::new();
-        let regions = // reader.get_regions_list();
-            [(-1, -1), (0, -1), (1, -1), (-1, 0), (0, 0), (1, 0), (-1, 1), (0, 1), (1, 1)];
-
-        for (i, (region_x, region_z)) in regions.into_iter().enumerate() {
-            let region = reader.try_read_region(region_offset_x + region_x, region_offset_z + region_z);
-            if let Some(mut region) = region {
-                let thr = std::thread::spawn(move || {
-                    ((region_x, region_z), Self::buffer_region(&mut region, region_offset_x, region_offset_z, region_x, region_z))
-                });
-                threads.push(thr);
-            } else {
-                println!("Region not found");
-                continue;
-            }
-            if i > 20 {
-                break;
-            }
-        }
-
-        for thr in threads {
-            let (key, content) = thr.join().unwrap();
-            self.images.insert(key, content);
-        }
-        println!("Time taken: {:?}", stopwatch.elapsed());
-        Ok(())
-    }
-
-    fn buffer_region(region: &mut Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> Image {
-        let mut pixmap = Pixmap::new(512, 512).unwrap();
-        let image_data = pixmap.pixels_mut();
-        for i in 0..=31 {
-            for j in 0..=31 {
-                let chunk_result = JourneyMapReader::get_chunk(region, i, j);
-                match chunk_result {
-                    Err(..) => {
-                        continue;
-                    }
-                    Ok(chunk) => {
-                        if chunk.is_none() {
-                            println!("Chunk not found");
-                            continue;
-                        }
-                        let chunk = chunk.unwrap();
-                        for (pos, data) in chunk.sections {
-                            let mut splited = pos.split(',');
-                            let x: i32 = splited.next().unwrap().parse().unwrap();
-                            let z: i32 = splited.next().unwrap().parse().unwrap();
-
-                            // ブロック座標をリージョン内の相対座標に変換
-                            let pixel_x = x - 512 * (region_offset_x + region_x);
-                            let pixel_y = z - 512 * (region_offset_z + region_z);
-
-                            // RGBA配列のインデックスを計算
-                            let i = (pixel_y * 512 + pixel_x) as usize;
-
-                            // iが画像内に入るなら色を設定
-                            if i < 512 * 512 {
-                                let color = biome::get_color(&data.biome_name);
-                                let color: tiny_skia::Color = color.into();
-                                image_data[i] = color.premultiply().to_color_u8()
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        let handle = Handle::from_rgba(512, 512, pixmap.take());
-        Image::new(handle)
-    }
-}
-
-impl<'a, Message: 'a, Renderer> From<JourneyMapViewer<Message, Renderer>> for Element<'a, Message, Theme, Renderer>
+impl<'a, Message: 'a, Renderer> From<JourneyMapViewer<'a, Message, Renderer>> for Element<'a, Message, Theme, Renderer>
 where Renderer: iced_wgpu::graphics::geometry::Renderer + 'a {
-    fn from(v: JourneyMapViewer<Message, Renderer>) -> Self {
+    fn from(v: JourneyMapViewer<'a, Message, Renderer>) -> Self {
         Self::new(v)
     }
 }
