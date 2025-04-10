@@ -7,10 +7,10 @@ edition = "2024"
 serde = { version = "1.0.219", features = ["derive"] }
 fastanvil = "0.31.0"
 fastnbt = "2.5.0"
-winit = "0.30"
+iced_wgpu = { version = "0.13.0", features = ["image", "geometry"] }
+iced = { version = "0.13.0", default-features = false, features = ["wgpu"] }
 tiny-skia = "0.11.4"
-softbuffer = "0.4.6"
-rusttype = "0.9.3"
+fltk = "1.5.5"
 
 [lib]
 name = "journeystreetmap"
@@ -19,3 +19,4 @@ path = "src/lib.rs"
 [[bin]]
 name = "journeystreetmap-editor"
 path = "src/main.rs"
+
