@@ -54,7 +54,7 @@ enum EditingType {
 
 #[derive(Debug, Default)]
 pub struct JourneyMapViewerState {
-    pub images: HashMap<(i32, i32), Image>,  // Regionごとの画像データをキャッシュするためのHashMap
+    pub images: HashMap<(i32, i32), Vec<u8>>,  // Regionごとの画像データをキャッシュするためのHashMap
     image_state: ImageState,
     edit_mode: EditingMode,
     editing_type: EditingType,
@@ -98,7 +98,7 @@ impl JourneyMapViewerState {
         Ok(())
     }
 
-    fn buffer_region(region: &mut Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> Image {
+    fn buffer_region(region: &mut Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> Vec<u8> {
         let mut pixmap = Pixmap::new(512, 512).unwrap();
         let image_data = pixmap.pixels_mut();
         for i in 0..=31 {
@@ -137,11 +137,7 @@ impl JourneyMapViewerState {
                 }
             }
         }
-        let handle = Handle::from_rgba(512, 512, pixmap.take());
-        Image::new(handle)
-    }
-}
-
+        pixmap.data().to_vec()
     }
 }
 

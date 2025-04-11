@@ -1,8 +1,14 @@
+mod map;
+
 use macroquad::prelude::*;
 use egui_macroquad::egui;
+use crate::map::JourneyMapViewerState;
 
 #[macroquad::main("journeystreetmap")]
 async fn main() {
+    let mut state = JourneyMapViewerState::default();
+    state.load_images().expect("Failed to load images");
+
     // macroquadの初期化
     egui_macroquad::cfg(|egui_ctx| {
         // ウィンドウの影の設定
@@ -38,7 +44,17 @@ async fn main() {
 
         // macroquadの描画処理
         clear_background(LIGHTGRAY);
+
+        // 画像を最後に描画する（グリッドの下に行かないように）
+        for ((rx, rz), img) in &state.images {
+            let dest_x = rx * 512;
+            let dest_y = rz * 512;
+            let texture = Texture2D::from_rgba8(512, 512, img);
+            draw_texture(texture, dest_x as f32, dest_y as f32, WHITE);
+        }
         draw_text("Hello macroquad!", 20.0, 40.0, 30.0, DARKGRAY);
+
+
 
         // 描画更新
         egui_macroquad::draw();
