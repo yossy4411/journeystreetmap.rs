@@ -1,95 +1,49 @@
-mod map;
+use macroquad::prelude::*;
+use egui_macroquad::egui;
 
-use crate::map::JourneyMapViewerState;
-use eframe::emath::vec2;
-use eframe::Frame;
-use egui::{Context, FontDefinitions, FontFamily, Pos2, Rect, ViewportBuilder};
-use std::sync::Arc;
+#[macroquad::main("journeystreetmap")]
+async fn main() {
+    // macroquadの初期化
+    egui_macroquad::cfg(|egui_ctx| {
+        // ウィンドウの影の設定
+        let style = egui_ctx.style();
+        let mut new_style = style.as_ref().clone();
+        new_style.visuals.window_shadow.extrusion = 10.0;
+        egui_ctx.set_style(new_style);
 
-fn main() {
-    let viewport = ViewportBuilder {
-        title: Some("JourneyMap Viewer".to_string()),
-        inner_size: Some(vec2(800.0, 600.0)),
-        ..Default::default()
-    };
-    let options = eframe::NativeOptions {
-        viewport,
-        ..Default::default()
-    };
-    eframe::run_native(
-        "JMViewer",
-        options,
-        Box::new(|cc: &eframe::CreationContext<'_>| {
-            let mut fonts = FontDefinitions::default();
+        // フォントの設定
+        let mut font_definitions = egui::FontDefinitions::default();
+        font_definitions.font_data.insert(
+            "Noto Sans JP".to_string(),
+            egui::FontData::from_static(include_bytes!("../fonts/NotoSansJP-Regular.ttf"))
+        );
+        font_definitions.families.insert(
+            egui::FontFamily::Proportional,
+            vec!["Noto Sans JP".to_string()]
+        );
 
-            fonts.font_data.insert(
-                "NotoSansJP".to_owned(),
-                Arc::new(egui::FontData::from_static(include_bytes!("../fonts/NotoSansJP-Regular.ttf"))),
-            );
+        egui_ctx.set_fonts(font_definitions);
+    });
 
-            fonts.families.get_mut(&FontFamily::Proportional).unwrap().insert(0, "NotoSansJP".to_string());
-
-            cc.egui_ctx.set_fonts(fonts);
-
-            Ok(Box::<Application>::default())
-        }),
-    ).expect("Failed to run the application");
-}
-
-#[derive(Debug, Clone)]
-enum Message {
-    OnButtonClick,
-}
-
-
-struct Application {
-    journey_map_viewer_state: JourneyMapViewerState
-}
-
-impl Default for Application {
-    fn default() -> Self {
-        let mut jm_state = JourneyMapViewerState::default();
-        jm_state.load_images().expect("Failed to load images from JourneyMapViewerState");
-        Self {
-            journey_map_viewer_state: jm_state,
-        }
-    }
-}
-
-impl eframe::App for Application {
-
-    fn update(&mut self, ctx: &Context, frame: &mut Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.vertical(|ui| {
-                ui.label("JourneyMapのマップをアプリで表示する試み");
-                ui.add_space(10.0);
-                ui.horizontal(|ui| {
-                    ui.vertical(|ui| {
-                        ui.label("ここにマップが来る");
-                        let painter = ui.painter();
-                        // 画像を最後に描画する（グリッドの下に行かないように）
-                        for ((rx, rz), img) in &self.journey_map_viewer_state.images {
-                            let dest_x = rx * 512;
-                            let dest_y = rz * 512;
-                            let rect = Rect::from_min_max(Pos2::new(dest_x as f32, dest_y as f32), Pos2::new(dest_x as f32 + 512.0, dest_y as f32 + 512.0));
-                            // painter.image(TextureId::Managed(0), rect, rect, Color32(img.color));
-                            // なんだか、先に画像をテクスチャに落とし込んで、それをアドレスで指定して描画するらしい。すごくGPU感がある。
-                        }
-
-                        // todo: JourneyMapViewerの描画
-                    });
-                    ui.vertical(|ui| {
-                        ui.add_space(10.0);
-                        ui.label("Hello World!");
-                        ui.add_space(10.0);
-                        if ui.button("ボタン牡丹ぼたん").clicked() {
-                            println!("Button clicked!");
-                        }
-                    });
-                })
-            })
-
-
+    loop {
+        // 定義
+        egui_macroquad::ui(|egui_ctx| {
+            egui::Window::new("JourneyStreetMap Editor").show(egui_ctx, |ui| {
+                ui.label("これは egui のウィンドウです！");
+                if ui.button("ボタン牡丹ぼたん").clicked() {
+                    println!("ボタンが押されたよ！");
+                }
+            });
         });
+
+        // macroquadの描画処理
+        clear_background(LIGHTGRAY);
+        draw_text("Hello macroquad!", 20.0, 40.0, 30.0, DARKGRAY);
+
+        // 描画更新
+        egui_macroquad::draw();
+
+        // next
+        next_frame().await;
     }
 }
