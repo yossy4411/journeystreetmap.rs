@@ -85,7 +85,7 @@ where Renderer: iced_wgpu::graphics::geometry::Renderer {
 
 #[derive(Debug, Default)]
 pub struct JourneyMapViewerState {
-    images: HashMap<(i32, i32), Image>,  // Regionごとの画像データをキャッシュするためのHashMap
+    pub images: HashMap<(i32, i32), Image>,  // Regionごとの画像データをキャッシュするためのHashMap
     image_state: ImageState,
     edit_mode: EditingMode,
     editing_type: EditingType,
