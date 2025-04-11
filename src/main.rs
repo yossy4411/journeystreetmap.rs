@@ -8,6 +8,9 @@ use crate::map::JourneyMapViewerState;
 async fn main() {
     let mut state = JourneyMapViewerState::default();
 
+    // 画像を読み込む
+    state.load_images().expect("Failed to load images");
+
     // macroquadの初期化
     egui_macroquad::cfg(|egui_ctx| {
         // ウィンドウの影の設定
@@ -29,8 +32,7 @@ async fn main() {
 
         egui_ctx.set_fonts(font_definitions);
 
-        // 画像を読み込む
-        state.load_images().expect("Failed to load images");
+
     });
 
     loop {

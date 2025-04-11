@@ -93,13 +93,14 @@ impl JourneyMapViewerState {
 
         for thr in threads {
             let (key, content) = thr.join().unwrap();
-            self.images.insert(key, content);
+            let texture = Texture2D::from_rgba8(512, 512, &content);
+            self.images.insert(key, texture);
         }
         println!("Time taken: {:?}", stopwatch.elapsed());
         Ok(())
     }
 
-    fn buffer_region(region: &mut Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> Texture2D {
+    fn buffer_region(region: &mut Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> Vec<u8> {
         let mut pixmap = Pixmap::new(512, 512).unwrap();
         let image_data = pixmap.pixels_mut();
         for i in 0..=31 {
@@ -138,7 +139,7 @@ impl JourneyMapViewerState {
                 }
             }
         }
-        Texture2D::from_rgba8(512, 512, pixmap.data())
+        pixmap.data().to_vec()
     }
 }
 
