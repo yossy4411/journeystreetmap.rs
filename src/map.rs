@@ -4,6 +4,7 @@ use journeystreetmap::journeymap::{biome, JourneyMapReader};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs::File;
+use macroquad::prelude::Texture2D;
 use tiny_skia::Pixmap;
 
 
@@ -54,7 +55,7 @@ enum EditingType {
 
 #[derive(Debug, Default)]
 pub struct JourneyMapViewerState {
-    pub images: HashMap<(i32, i32), Vec<u8>>,  // Regionごとの画像データをキャッシュするためのHashMap
+    pub images: HashMap<(i32, i32), Texture2D>,  // Regionごとの画像データをキャッシュするためのHashMap
     image_state: ImageState,
     edit_mode: EditingMode,
     editing_type: EditingType,
@@ -98,7 +99,7 @@ impl JourneyMapViewerState {
         Ok(())
     }
 
-    fn buffer_region(region: &mut Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> Vec<u8> {
+    fn buffer_region(region: &mut Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> Texture2D {
         let mut pixmap = Pixmap::new(512, 512).unwrap();
         let image_data = pixmap.pixels_mut();
         for i in 0..=31 {
@@ -137,7 +138,7 @@ impl JourneyMapViewerState {
                 }
             }
         }
-        pixmap.data().to_vec()
+        Texture2D::from_rgba8(512, 512, pixmap.data())
     }
 }
 

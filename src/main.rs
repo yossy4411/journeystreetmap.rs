@@ -7,7 +7,6 @@ use crate::map::JourneyMapViewerState;
 #[macroquad::main("journeystreetmap")]
 async fn main() {
     let mut state = JourneyMapViewerState::default();
-    state.load_images().expect("Failed to load images");
 
     // macroquadの初期化
     egui_macroquad::cfg(|egui_ctx| {
@@ -29,6 +28,9 @@ async fn main() {
         );
 
         egui_ctx.set_fonts(font_definitions);
+
+        // 画像を読み込む
+        state.load_images().expect("Failed to load images");
     });
 
     loop {
@@ -49,8 +51,7 @@ async fn main() {
         for ((rx, rz), img) in &state.images {
             let dest_x = rx * 512;
             let dest_y = rz * 512;
-            let texture = Texture2D::from_rgba8(512, 512, img);
-            draw_texture(texture, dest_x as f32, dest_y as f32, WHITE);
+            draw_texture(*img, dest_x as f32, dest_y as f32, WHITE);
         }
         draw_text("Hello macroquad!", 20.0, 40.0, 30.0, DARKGRAY);
 
