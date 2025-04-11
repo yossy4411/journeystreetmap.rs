@@ -10,7 +10,11 @@ fastnbt = "2.5.0"
 iced_wgpu = { version = "0.13.0", features = ["image", "geometry"] }
 iced = { version = "0.13.0", default-features = false, features = ["wgpu"] }
 tiny-skia = "0.11.4"
-fltk = "1.5.5"
+fltk = "1.5.6"
+egui = "0.31"
+eframe = { version = "0.31", features = ["wgpu"] }
+wgpu = "24"
+
 
 [lib]
 name = "journeystreetmap"
