@@ -4,6 +4,7 @@ use journeystreetmap::journeymap::{biome, JourneyMapReader};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs::File;
+use macroquad::math::{vec2, Vec2};
 use macroquad::prelude::Texture2D;
 use tiny_skia::Pixmap;
 
@@ -13,23 +14,15 @@ use tiny_skia::Pixmap;
 struct MouseHandling {
     zoom: f32,
     zoom_factor: f32,
-    offset_x: f32,
-    offset_y: f32,
-    dragging: bool,
-    last_mouse_x: f32,
-    last_mouse_y: f32,
+    position: Vec2
 }
 
 impl Default for MouseHandling {
     fn default() -> Self {
         MouseHandling {
-            zoom: 1.0,
+            zoom: 0.2,
             zoom_factor: 1.25,
-            offset_x: 0.0,
-            offset_y: 0.0,
-            dragging: false,
-            last_mouse_x: 0.0,
-            last_mouse_y: 0.0,
+            position: Vec2::new(0.0, 0.0)
         }
     }
 }
@@ -143,3 +136,22 @@ impl JourneyMapViewerState {
     }
 }
 
+impl JourneyMapViewerState {
+    /// マウスのドラッグの処理
+    pub fn dragging(&mut self, delta: Vec2) {
+        self.mouse_handling.position += delta;
+    }
+
+    /// 画像の参照を返す
+    pub fn images(&self) -> &HashMap<(i32, i32), Texture2D> {
+        &self.images
+    }
+
+    pub fn camera_position(&self) -> Vec2 {
+        self.mouse_handling.position
+    }
+
+    pub fn camera_zoom(&self) -> Vec2 {
+        vec2(self.mouse_handling.zoom, self.mouse_handling.zoom)
+    }
+}

@@ -31,9 +31,9 @@ async fn main() {
         );
 
         egui_ctx.set_fonts(font_definitions);
-
-
     });
+
+    let mut camera = Camera2D::default();
 
     loop {
         // 定義
@@ -49,14 +49,24 @@ async fn main() {
         // macroquadの描画処理
         clear_background(LIGHTGRAY);
 
-        // 画像を最後に描画する（グリッドの下に行かないように）
+        // マウスの処理
+        if is_mouse_button_down(MouseButton::Left) {
+            // マウスが押下されているとき
+            state.dragging(mouse_delta_position());
+        }
+
+        camera.target = state.camera_position();
+        camera.zoom = vec2(1.0, 1.0);
+
+        set_camera(&camera);
+
+        // カメラへ描画
         for ((rx, rz), img) in state.images() {
             let dest_x = rx * 512;
             let dest_y = rz * 512;
             draw_texture(*img, dest_x as f32, dest_y as f32, WHITE);
         }
         draw_text("Hello macroquad!", 20.0, 40.0, 30.0, DARKGRAY);
-
 
 
         // 描画更新
