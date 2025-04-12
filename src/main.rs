@@ -56,7 +56,7 @@ async fn main() {
         }
 
         camera.target = state.camera_position();
-        camera.zoom = vec2(1.0, 1.0);
+        camera.zoom = state.camera_zoom();
 
         set_camera(&camera);
 
