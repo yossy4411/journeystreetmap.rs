@@ -36,16 +36,6 @@ async fn main() {
     let mut camera = Camera2D::default();
 
     loop {
-        // 定義
-        egui_macroquad::ui(|egui_ctx| {
-            egui::Window::new("JourneyStreetMap Editor").show(egui_ctx, |ui| {
-                ui.label("これは egui のウィンドウです！");
-                if ui.button("ボタン牡丹ぼたん").clicked() {
-                    println!("ボタンが押されたよ！");
-                }
-            });
-        });
-
         // macroquadの描画処理
         clear_background(LIGHTGRAY);
 
@@ -67,6 +57,18 @@ async fn main() {
             draw_texture(*img, dest_x as f32, dest_y as f32, WHITE);
         }
         draw_text("Hello macroquad!", 20.0, 40.0, 30.0, DARKGRAY);
+
+        set_default_camera();
+
+        // eguiの定義
+        egui_macroquad::ui(|egui_ctx| {
+            egui::Window::new("JourneyStreetMap Editor").show(egui_ctx, |ui| {
+                ui.label("これは egui のウィンドウです！");
+                if ui.button("ボタン牡丹ぼたん").clicked() {
+                    println!("ボタンが押されたよ！");
+                }
+            });
+        });
 
 
         // 描画更新
