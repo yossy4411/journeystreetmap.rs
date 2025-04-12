@@ -50,7 +50,7 @@ async fn main() {
         clear_background(LIGHTGRAY);
 
         // 画像を最後に描画する（グリッドの下に行かないように）
-        for ((rx, rz), img) in &state.images {
+        for ((rx, rz), img) in state.images() {
             let dest_x = rx * 512;
             let dest_y = rz * 512;
             draw_texture(*img, dest_x as f32, dest_y as f32, WHITE);

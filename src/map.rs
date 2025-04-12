@@ -10,7 +10,7 @@ use tiny_skia::Pixmap;
 
 #[derive(Debug, Clone)]
 /// 画像の状態を管理する構造体
-struct ImageState {
+struct MouseHandling {
     zoom: f32,
     zoom_factor: f32,
     offset_x: f32,
@@ -20,9 +20,9 @@ struct ImageState {
     last_mouse_y: f32,
 }
 
-impl Default for ImageState {
+impl Default for MouseHandling {
     fn default() -> Self {
-        ImageState {
+        MouseHandling {
             zoom: 1.0,
             zoom_factor: 1.25,
             offset_x: 0.0,
@@ -55,8 +55,8 @@ enum EditingType {
 
 #[derive(Debug, Default)]
 pub struct JourneyMapViewerState {
-    pub images: HashMap<(i32, i32), Texture2D>,  // Regionごとの画像データをキャッシュするためのHashMap
-    image_state: ImageState,
+    images: HashMap<(i32, i32), Texture2D>,  // Regionごとの画像データをキャッシュするためのHashMap
+    mouse_handling: MouseHandling,
     edit_mode: EditingMode,
     editing_type: EditingType,
     editable: bool,
