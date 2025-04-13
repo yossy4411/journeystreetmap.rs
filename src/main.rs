@@ -69,6 +69,7 @@ async fn main() {
 
         camera.target = state.camera_position();
         camera.zoom = state.camera_zoom(screen_size);
+        camera.rotation = 180.0;
 
         set_camera(&camera);
 
