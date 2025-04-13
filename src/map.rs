@@ -5,8 +5,7 @@ use std::fmt::Debug;
 use std::fs::File;
 use macroquad::math::{Vec2};
 use macroquad::prelude::Texture2D;
-use tiny_skia::Pixmap;
-
+use journeystreetmap::journeymap::biome::RGB;
 
 #[derive(Debug, Clone)]
 /// 画像の状態を管理する構造体
@@ -83,8 +82,7 @@ impl JourneyMapViewerState {
     }
 
     fn buffer_region(region: &mut Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> Vec<u8> {
-        let mut pixmap = Pixmap::new(512, 512).unwrap();
-        let image_data = pixmap.pixels_mut();
+        let mut image_data = [RGB::default(); 512 * 512];
         for i in 0..=31 {
             for j in 0..=31 {
                 let chunk_result = JourneyMapReader::get_chunk(region, i, j);
@@ -113,15 +111,22 @@ impl JourneyMapViewerState {
                             // iが画像内に入るなら色を設定
                             if i < 512 * 512 {
                                 let color = biome::get_color(&data.biome_name);
-                                let color: tiny_skia::Color = color.into();
-                                image_data[i] = color.premultiply().to_color_u8()
+                                image_data[i] = color;
                             }
                         }
                     }
                 }
             }
         }
-        pixmap.data().to_vec()
+        let mut colors = Vec::with_capacity(512 * 512 * 4);  // RGBA8
+        for i in 0..512 * 512 {
+            let color = image_data[i];
+            colors.push(color.r);
+            colors.push(color.g);
+            colors.push(color.b);
+            colors.push(255); // Alpha
+        }
+        colors
     }
 }
 

@@ -1824,7 +1824,6 @@ dependencies = [
  "fastnbt",
  "macroquad",
  "serde",
- "tiny-skia",
 ]
 
 [[package]]
@@ -3344,7 +3343,6 @@ dependencies = [
  "bytemuck",
  "cfg-if",
  "log",
- "png",
  "tiny-skia-path",
 ]
 
