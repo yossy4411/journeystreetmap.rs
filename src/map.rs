@@ -14,7 +14,7 @@ use tiny_skia::Pixmap;
 struct MouseHandling {
     zoom: f32,
     zoom_factor: f32,
-    position: Vec2
+    position: Vec2,
 }
 
 impl Default for MouseHandling {
@@ -22,7 +22,7 @@ impl Default for MouseHandling {
         MouseHandling {
             zoom: 0.2,
             zoom_factor: 1.25,
-            position: Vec2::new(0.0, 0.0)
+            position: Vec2::new(0.0, 0.0),
         }
     }
 }
@@ -138,8 +138,20 @@ impl JourneyMapViewerState {
 
 impl JourneyMapViewerState {
     /// マウスのドラッグの処理
-    pub fn dragging(&mut self, delta: Vec2) {
-        self.mouse_handling.position += delta;
+    pub fn dragging(&mut self, delta: Vec2, screen_size: Vec2) {
+        self.mouse_handling.position += delta / self.mouse_handling.zoom * screen_size;
+    }
+
+    /// ズームの処理
+    pub fn scrolling(&mut self, delta: f32) {
+        if delta == 0.0 {
+            return;
+        }
+        if delta > 0.0 {
+            self.mouse_handling.zoom *= self.mouse_handling.zoom_factor;
+        } else {
+            self.mouse_handling.zoom /= self.mouse_handling.zoom_factor;
+        }
     }
 
     /// 画像の参照を返す
@@ -151,7 +163,9 @@ impl JourneyMapViewerState {
         self.mouse_handling.position
     }
 
-    pub fn camera_zoom(&self) -> Vec2 {
-        vec2(self.mouse_handling.zoom, self.mouse_handling.zoom)
+    pub fn camera_zoom(&self, screen_size: Vec2) -> Vec2 {
+        vec2(self.mouse_handling.zoom, self.mouse_handling.zoom) / screen_size
     }
+
+
 }

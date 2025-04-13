@@ -35,18 +35,40 @@ async fn main() {
 
     let mut camera = Camera2D::default();
 
+    let mut cursor_in_ui = false;
+
     loop {
+        // eguiの定義
+        egui_macroquad::ui(|egui_ctx| {
+            egui::Window::new("JourneyStreetMap Editor").show(egui_ctx, |ui| {
+                ui.label("これは egui のウィンドウです！");
+                if ui.button("ボタン牡丹ぼたん").clicked() {
+                    println!("ボタンが押されたよ！");
+                }
+            });
+            cursor_in_ui = egui_ctx.is_pointer_over_area();
+            println!("cursors: {}", cursor_in_ui);
+        });
+
         // macroquadの描画処理
         clear_background(LIGHTGRAY);
 
-        // マウスの処理
-        if is_mouse_button_down(MouseButton::Left) {
-            // マウスが押下されているとき
-            state.dragging(mouse_delta_position());
+        let screen_size = vec2(screen_width(), screen_height());
+
+        if !cursor_in_ui {
+            // マウスの処理
+            if is_mouse_button_down(MouseButton::Left) {
+                // マウスが押下されているとき
+                state.dragging(mouse_delta_position(), screen_size);
+            }
+
+            // ホイールの処理
+            state.scrolling(mouse_wheel().1);
         }
 
+
         camera.target = state.camera_position();
-        camera.zoom = state.camera_zoom();
+        camera.zoom = state.camera_zoom(screen_size);
 
         set_camera(&camera);
 
@@ -56,19 +78,9 @@ async fn main() {
             let dest_y = rz * 512;
             draw_texture(*img, dest_x as f32, dest_y as f32, WHITE);
         }
-        draw_text("Hello macroquad!", 20.0, 40.0, 30.0, DARKGRAY);
 
         set_default_camera();
-
-        // eguiの定義
-        egui_macroquad::ui(|egui_ctx| {
-            egui::Window::new("JourneyStreetMap Editor").show(egui_ctx, |ui| {
-                ui.label("これは egui のウィンドウです！");
-                if ui.button("ボタン牡丹ぼたん").clicked() {
-                    println!("ボタンが押されたよ！");
-                }
-            });
-        });
+        draw_text("Hello macroquad!", 20.0, 40.0, 30.0, DARKGRAY);
 
 
         // 描画更新
