@@ -55,17 +55,21 @@ async fn main() {
 
         let screen_size = vec2(screen_width(), screen_height());
 
-        if !cursor_in_ui {
-            // マウスの処理
-            if is_mouse_button_down(MouseButton::Left) {
-                // マウスが押下されているとき
-                state.dragging(mouse_delta_position(), screen_size);
-            }
+        // マウスの処理
+        if !cursor_in_ui && is_mouse_button_down(MouseButton::Left) {
+            // マウスが押下されたとき
+            state.clicked();
+        }
+        if is_mouse_button_released(MouseButton::Left) {
+            // マウスが離されたとき
+            state.released();
+        }
+        state.dragging(mouse_delta_position(), screen_size);
 
-            // ホイールの処理
+        // ホイールの処理
+        if cursor_in_ui {
             state.scrolling(mouse_wheel().1);
         }
-
 
         camera.target = state.camera_position();
         camera.zoom = state.camera_zoom(screen_size);

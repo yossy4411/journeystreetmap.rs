@@ -15,6 +15,7 @@ struct MouseHandling {
     zoom: f32,
     zoom_factor: f32,
     position: Vec2,
+    pressed: bool,
 }
 
 impl Default for MouseHandling {
@@ -23,6 +24,7 @@ impl Default for MouseHandling {
             zoom: 0.2,
             zoom_factor: 1.25,
             position: Vec2::new(0.0, 0.0),
+            pressed: false,
         }
     }
 }
@@ -137,8 +139,22 @@ impl JourneyMapViewerState {
 }
 
 impl JourneyMapViewerState {
+    /// クリックされた瞬間の処理
+    pub fn clicked(&mut self) {
+        self.mouse_handling.pressed = true;
+        // todo Pathを追加する処理などなど
+    }
+
+    /// クリックが離された瞬間の処理
+    pub fn released(&mut self) {
+        self.mouse_handling.pressed = false;
+    }
+
     /// マウスのドラッグの処理
     pub fn dragging(&mut self, delta: Vec2, screen_size: Vec2) {
+        if !self.mouse_handling.pressed {
+            return;
+        }
         self.mouse_handling.position += delta / self.mouse_handling.zoom * screen_size;
     }
 
