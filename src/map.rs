@@ -57,10 +57,10 @@ impl JourneyMapViewerState {
             [(-1, -1), (0, -1), (1, -1), (-1, 0), (0, 0), (1, 0), (-1, 1), (0, 1), (1, 1)];
 
         for (i, (region_x, region_z)) in regions.into_iter().enumerate() {
-            let region = reader.try_read_region(region_offset_x + region_x, region_offset_z + region_z);
-            if let Some(mut region) = region {
-                let thr = std::thread::spawn(move || {
-                    ((region_x, region_z), Self::buffer_region(&mut region, region_offset_x, region_offset_z, region_x, region_z))
+            let region = reader.try_read_region(region_offset_x + region_x, region_offset_z + region_z).await;
+            if region.is_some() {
+                let thr = tokio::spawn(async move {
+                    Self::buffer_region(region.unwrap(), region_offset_x, region_offset_z, region_x, region_z).await
                 });
                 threads.push(thr);
             } else {
@@ -73,7 +73,7 @@ impl JourneyMapViewerState {
         }
 
         for thr in threads {
-            let (key, content) = thr.join().unwrap();
+            let (key, content) = thr.await.unwrap();
             let texture = Texture2D::from_rgba8(512, 512, &content);
             self.images.insert(key, texture);
         }
@@ -81,11 +81,11 @@ impl JourneyMapViewerState {
         Ok(())
     }
 
-    async fn buffer_region(region: &mut Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> Vec<u8> {
+    async fn buffer_region(mut region: Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> ((i32, i32), Vec<u8>) {
         let mut image_data = [RGB::default(); 512 * 512];
         for i in 0..=31 {
             for j in 0..=31 {
-                let chunk_result = JourneyMapReader::get_chunk(region, i, j);
+                let chunk_result = JourneyMapReader::get_chunk(&mut region, i, j).await;
                 match chunk_result {
                     Err(..) => {
                         continue;
@@ -126,7 +126,7 @@ impl JourneyMapViewerState {
             colors.push(color.b);
             colors.push(255); // Alpha
         }
-        colors
+        ((region_x, region_z), colors)
     }
 }
 
