@@ -176,11 +176,11 @@ impl JourneyMapViewerState {
     }
 
     pub fn camera_position(&self) -> Vec2 {
-        vec2(-self.mouse_handling.position.x, self.mouse_handling.position.y)
+        vec2(self.mouse_handling.position.x, self.mouse_handling.position.y)
     }
 
     pub fn camera_zoom(&self, screen_size: Vec2) -> Vec2 {
-        vec2(self.mouse_handling.zoom, self.mouse_handling.zoom) / screen_size
+        vec2(self.mouse_handling.zoom, -self.mouse_handling.zoom) / screen_size
     }
 
 
