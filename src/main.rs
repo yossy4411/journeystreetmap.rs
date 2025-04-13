@@ -72,7 +72,6 @@ async fn main() {
                 }
             });
             cursor_in_ui = egui_ctx.is_pointer_over_area();
-            println!("cursors: {}", cursor_in_ui);
         });
 
         // macroquadの描画処理
