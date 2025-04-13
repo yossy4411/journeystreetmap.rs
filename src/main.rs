@@ -34,6 +34,7 @@ async fn main() {
     });
 
     let mut camera = Camera2D::default();
+    camera.zoom = vec2(1.0 / screen_width(), -1.0 / screen_height());
 
     let mut cursor_in_ui = false;
 
@@ -83,10 +84,18 @@ async fn main() {
             state.released();
         }
         state.dragging(mouse_delta_position(), screen_size);
-
+        let mouse_position = mouse_position().into();
         // ホイールの処理
         if !cursor_in_ui {
-            state.scrolling(mouse_wheel().1);
+            let before_zoom = camera.screen_to_world(mouse_position);
+
+            let delta = mouse_wheel().1;
+            if delta != 0.0 {
+                let factor = 1.1f32.powf(delta);
+                camera.zoom *= factor;
+                let after_zoom = camera.screen_to_world(mouse_position);
+                camera.target += before_zoom - after_zoom;
+            }
         }
 
         // キーボードの処理
@@ -108,9 +117,6 @@ async fn main() {
             // 編集の種別を切り替え
             state.toggle_editing_type();
         }
-
-        camera.target = state.camera_position();
-        camera.zoom = state.camera_zoom(screen_size);
 
         set_camera(&camera);
 

@@ -158,18 +158,6 @@ impl JourneyMapViewerState {
         self.mouse_handling.position += delta / self.mouse_handling.zoom * screen_size;
     }
 
-    /// ズームの処理
-    pub fn scrolling(&mut self, delta: f32) {
-        if delta == 0.0 {
-            return;
-        }
-        if delta > 0.0 {
-            self.mouse_handling.zoom *= self.mouse_handling.zoom_factor;
-        } else {
-            self.mouse_handling.zoom /= self.mouse_handling.zoom_factor;
-        }
-    }
-
     /// 画像の参照を返す
     pub fn images(&self) -> &HashMap<(i32, i32), Texture2D> {
         &self.images
