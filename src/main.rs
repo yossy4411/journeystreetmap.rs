@@ -2,7 +2,7 @@ mod map;
 
 use macroquad::prelude::*;
 use egui_macroquad::egui;
-use crate::map::JourneyMapViewerState;
+use crate::map::{JourneyMapViewerState};
 
 #[macroquad::main("journeystreetmap")]
 async fn main() {
@@ -41,7 +41,25 @@ async fn main() {
         // eguiの定義
         egui_macroquad::ui(|egui_ctx| {
             egui::Window::new("JourneyStreetMap Editor").show(egui_ctx, |ui| {
-                ui.label("これは egui のウィンドウです！");
+
+                if state.editing_mode() == map::EditingMode::View {
+                    ui.label("編集モード: 表示");
+                } else {
+                    let mode_str = match state.editing_mode() {
+                        map::EditingMode::Insert => "挿入",
+                        map::EditingMode::Delete => "削除",
+                        map::EditingMode::Select => "選択",
+                        map::EditingMode::View => "表示",
+                    };
+                    let type_str = match state.editing_type() {
+                        map::EditingType::Stroke => "線",
+                        map::EditingType::Fill => "塗り",
+                        map::EditingType::Poi => "場所",
+                    };
+                    ui.label(format!("編集モード: {}（{}）", mode_str, type_str));
+                }
+
+
                 if ui.button("ボタン牡丹ぼたん").clicked() {
                     println!("ボタンが押されたよ！");
                 }
@@ -69,6 +87,26 @@ async fn main() {
         // ホイールの処理
         if !cursor_in_ui {
             state.scrolling(mouse_wheel().1);
+        }
+
+        // キーボードの処理
+        // 編集モードの切り替え
+        if is_key_pressed(KeyCode::I) {
+            state.set_editing_mode(map::EditingMode::Insert);
+        }
+        if is_key_pressed(KeyCode::D) {
+            state.set_editing_mode(map::EditingMode::Delete);
+        }
+        if is_key_pressed(KeyCode::S) {
+            state.set_editing_mode(map::EditingMode::Select);
+        }
+        if is_key_pressed(KeyCode::V) {
+            state.set_editing_mode(map::EditingMode::View);
+        }
+
+        if is_key_pressed(KeyCode::E) {
+            // 編集の種別を切り替え
+            state.toggle_editing_type();
         }
 
         camera.target = state.camera_position();

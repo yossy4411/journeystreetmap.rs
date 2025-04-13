@@ -31,7 +31,7 @@ impl Default for MouseHandling {
 
 #[derive(Eq, PartialEq, Hash, Copy, Clone, Debug, Default)]
 /// 編集のモード
-enum EditingMode {
+pub enum EditingMode {
     #[default]
     Insert,
     Delete,
@@ -41,7 +41,7 @@ enum EditingMode {
 
 // 編集対象
 #[derive(PartialEq, Hash, Copy, Clone, Debug, Default)]
-enum EditingType {
+pub enum EditingType {
     #[default]
     Stroke,  // 線（道路）
     Fill,    // 塗りつぶし（建物）
@@ -183,5 +183,25 @@ impl JourneyMapViewerState {
         vec2(self.mouse_handling.zoom, -self.mouse_handling.zoom) / screen_size
     }
 
+    pub fn editing_type(&self) -> EditingType {
+        self.editing_type
+    }
 
+    pub fn editing_mode(&self) -> EditingMode {
+        self.edit_mode
+    }
+
+    /// 編集モードを切り替える（周期的に）
+    pub fn toggle_editing_type(&mut self) {
+        self.editing_type = match self.editing_type {
+            EditingType::Stroke => EditingType::Fill,
+            EditingType::Fill => EditingType::Poi,
+            EditingType::Poi => EditingType::Stroke,
+        };
+    }
+
+    /// 編集モードを切り替える
+    pub fn set_editing_mode(&mut self, editing_mode: EditingMode) {
+        self.edit_mode = editing_mode;
+    }
 }
