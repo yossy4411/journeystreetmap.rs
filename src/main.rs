@@ -67,7 +67,7 @@ async fn main() {
         state.dragging(mouse_delta_position(), screen_size);
 
         // ホイールの処理
-        if cursor_in_ui {
+        if !cursor_in_ui {
             state.scrolling(mouse_wheel().1);
         }
 
