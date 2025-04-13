@@ -95,7 +95,7 @@ async fn main() {
 
             let delta = mouse_wheel().1;
             if delta != 0.0 {
-                let factor = 1.1f32.powf(delta);
+                let factor = 1.3f32.powf(delta);
                 camera.zoom *= factor;
                 let after_zoom = camera.screen_to_world(mouse_position);
                 camera.target += before_zoom - after_zoom;
