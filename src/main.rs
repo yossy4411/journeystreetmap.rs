@@ -37,6 +37,7 @@ async fn main() {
     camera.zoom = vec2(1.0 / screen_width(), -1.0 / screen_height());
 
     let mut cursor_in_ui = false;
+    let mut clicked = false;
 
     loop {
         // eguiの定義
@@ -72,18 +73,21 @@ async fn main() {
         // macroquadの描画処理
         clear_background(LIGHTGRAY);
 
-        let screen_size = vec2(screen_width(), screen_height());
-
         // マウスの処理
         if !cursor_in_ui && is_mouse_button_down(MouseButton::Left) {
             // マウスが押下されたとき
-            state.clicked();
+            clicked = true;
         }
         if is_mouse_button_released(MouseButton::Left) {
             // マウスが離されたとき
-            state.released();
+            clicked = false;
         }
-        state.dragging(mouse_delta_position(), screen_size);
+
+        let delta = mouse_delta_position();
+        if clicked {
+            camera.target += delta / vec2(camera.zoom.x, -camera.zoom.y);
+        }
+
         let mouse_position = mouse_position().into();
         // ホイールの処理
         if !cursor_in_ui {

@@ -18,17 +18,6 @@ struct MouseHandling {
     pressed: bool,
 }
 
-impl Default for MouseHandling {
-    fn default() -> Self {
-        MouseHandling {
-            zoom: 0.2,
-            zoom_factor: 1.25,
-            position: Vec2::new(0.0, 0.0),
-            pressed: false,
-        }
-    }
-}
-
 #[derive(Eq, PartialEq, Hash, Copy, Clone, Debug, Default)]
 /// 編集のモード
 pub enum EditingMode {
@@ -51,7 +40,6 @@ pub enum EditingType {
 #[derive(Debug, Default)]
 pub struct JourneyMapViewerState {
     images: HashMap<(i32, i32), Texture2D>,  // Regionごとの画像データをキャッシュするためのHashMap
-    mouse_handling: MouseHandling,
     edit_mode: EditingMode,
     editing_type: EditingType,
     editable: bool,
@@ -139,36 +127,9 @@ impl JourneyMapViewerState {
 }
 
 impl JourneyMapViewerState {
-    /// クリックされた瞬間の処理
-    pub fn clicked(&mut self) {
-        self.mouse_handling.pressed = true;
-        // todo Pathを追加する処理などなど
-    }
-
-    /// クリックが離された瞬間の処理
-    pub fn released(&mut self) {
-        self.mouse_handling.pressed = false;
-    }
-
-    /// マウスのドラッグの処理
-    pub fn dragging(&mut self, delta: Vec2, screen_size: Vec2) {
-        if !self.mouse_handling.pressed {
-            return;
-        }
-        self.mouse_handling.position += delta / self.mouse_handling.zoom * screen_size;
-    }
-
     /// 画像の参照を返す
     pub fn images(&self) -> &HashMap<(i32, i32), Texture2D> {
         &self.images
-    }
-
-    pub fn camera_position(&self) -> Vec2 {
-        vec2(self.mouse_handling.position.x, self.mouse_handling.position.y)
-    }
-
-    pub fn camera_zoom(&self, screen_size: Vec2) -> Vec2 {
-        vec2(self.mouse_handling.zoom, -self.mouse_handling.zoom) / screen_size
     }
 
     pub fn editing_type(&self) -> EditingType {
