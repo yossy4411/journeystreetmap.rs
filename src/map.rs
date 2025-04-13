@@ -1,10 +1,9 @@
 use fastanvil::Region;
-use fltk::prelude::{GroupExt, InputExt, MenuExt, WidgetBase};
 use journeystreetmap::journeymap::{biome, JourneyMapReader};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs::File;
-use macroquad::math::{vec2, Vec2};
+use macroquad::math::{Vec2};
 use macroquad::prelude::Texture2D;
 use tiny_skia::Pixmap;
 
