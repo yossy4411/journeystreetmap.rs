@@ -1,8 +1,8 @@
-use fastanvil::Region;
+use fastanvil::asyncio::Region;
 use journeystreetmap::journeymap::{biome, JourneyMapReader};
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::fs::File;
+use tokio::fs::File;
 use macroquad::math::{Vec2};
 use macroquad::prelude::Texture2D;
 use journeystreetmap::journeymap::biome::RGB;
@@ -45,7 +45,7 @@ pub struct JourneyMapViewerState {
 }
 
 impl JourneyMapViewerState {
-    pub fn load_images(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn load_images(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut reader = JourneyMapReader::new("/home/okayu/.local/share/ModrinthApp/profiles/Fabulously Optimized/journeymap/data/mp/160~251~235~246/");
         let region_offset_x = 0;
         let region_offset_z = 0;
@@ -81,7 +81,7 @@ impl JourneyMapViewerState {
         Ok(())
     }
 
-    fn buffer_region(region: &mut Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> Vec<u8> {
+    async fn buffer_region(region: &mut Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> Vec<u8> {
         let mut image_data = [RGB::default(); 512 * 512];
         for i in 0..=31 {
             for j in 0..=31 {
