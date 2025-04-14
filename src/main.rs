@@ -2,6 +2,7 @@ mod map;
 
 use macroquad::prelude::*;
 use egui_macroquad::egui;
+use tokio::runtime;
 use tokio::runtime::Runtime;
 use crate::map::{JourneyMapViewerState};
 
@@ -10,6 +11,7 @@ async fn main() {
     let mut state = JourneyMapViewerState::default();
 
     // 画像を読み込む
+    let runtime = runtime::Builder::new_multi_thread().worker_threads(4).enable_all().build().unwrap();
     let runtime = Runtime::new().expect("Failed to create Tokio runtime");
     runtime.block_on(async {
         state.load_images().await.expect("Failed to load images");
