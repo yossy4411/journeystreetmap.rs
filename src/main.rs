@@ -41,6 +41,8 @@ async fn main() {
     let mut camera = Camera2D::default();
     camera.zoom = vec2(1.0 / screen_width(), -1.0 / screen_height());
 
+    let mut zoom_xy = 1.0;
+
     let mut cursor_in_ui = false;
     let mut clicked = false;
 
@@ -101,6 +103,7 @@ async fn main() {
             if delta != 0.0 {
                 let factor = 1.3f32.powf(delta);
                 camera.zoom *= factor;
+                zoom_xy *= factor;
                 let after_zoom = camera.screen_to_world(mouse_position);
                 camera.target += before_zoom - after_zoom;
             }
@@ -134,6 +137,35 @@ async fn main() {
             let dest_y = rz * 512;
             draw_texture(*img, dest_x as f32, dest_y as f32, WHITE);
         }
+
+
+        {
+            let screen_origin = camera.screen_to_world(vec2(0.0, 0.0));
+            let screen_blocks = camera.screen_to_world(vec2(screen_width(), screen_height())) - screen_origin;
+            // グリッドの表示
+            {
+                let wx = screen_origin.x;
+                let gx = wx - wx.rem_euclid(512.0);
+                for i in 0..=(screen_blocks / 512.0).x as i32 {
+                    let x = gx + i as f32 * 512.0;
+                    draw_line(x, 0.0, x, screen_height(), 0.003 / camera.zoom.x, WHITE);
+                }
+            }
+            if zoom_xy >= 2.0 {
+                let wx = screen_origin.x;
+                let gx = wx - wx.rem_euclid(16.0);
+                for i in 0..=(screen_blocks / 16.0).x as i32 {
+                    let x = gx + i as f32 * 16.0;
+                    draw_line(x, 0.0, x, screen_height(), 0.001 / camera.zoom.x, GRAY);
+                }
+            }
+        }
+
+        // マウスとかの描画
+        let mouse_pos = camera.screen_to_world(mouse_position);
+        let block_x = mouse_pos.x.floor();
+        let block_y = mouse_pos.y.floor();
+        draw_rectangle(block_x, block_y, 1.0, 1.0, Color::new(1.0, 0.0, 0.0, 0.5));
 
         set_default_camera();
         draw_text("Hello macroquad!", 20.0, 40.0, 30.0, DARKGRAY);

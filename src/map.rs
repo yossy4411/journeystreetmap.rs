@@ -54,7 +54,8 @@ impl JourneyMapViewerState {
 
         let mut threads = Vec::new();
         let regions = // reader.get_regions_list();
-            [(-1, -1), (0, -1), (1, -1), (-1, 0), (0, 0), (1, 0), (-1, 1), (0, 1), (1, 1)];
+            // [(-1, -1), (0, -1), (1, -1), (-1, 0), (0, 0), (1, 0), (-1, 1), (0, 1), (1, 1)];
+            [(0, 0)];
 
         for (i, (region_x, region_z)) in regions.into_iter().enumerate() {
             let region = reader.try_read_region(region_offset_x + region_x, region_offset_z + region_z).await;
