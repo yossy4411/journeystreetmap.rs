@@ -1,27 +1,18 @@
 mod map;
 
-use std::collections::HashMap;
-use std::sync::Arc;
 use macroquad::prelude::*;
 use egui_macroquad::egui;
-use tokio::runtime;
 use tokio::runtime::Runtime;
-use tokio::sync::Mutex;
 use crate::map::{JourneyMapViewerState};
 
 #[macroquad::main("journeystreetmap")]
 async fn main() {
     let mut state = JourneyMapViewerState::default();
 
-    let mut images = Arc::new(Mutex::new(HashMap::new()));
-
     // 画像を読み込む
-    let runtime = runtime::Builder::new_multi_thread().worker_threads(4).enable_all().build().unwrap();
-
-    let images_clone = images.clone();
-
-    let handle = runtime.spawn(async {
-        map::load_images(images_clone).await.expect("Failed to load images");
+    let runtime = Runtime::new().expect("Failed to create Tokio runtime");
+    runtime.block_on(async {
+        state.load_images().await.expect("Failed to load images");
     });
 
 
@@ -138,13 +129,10 @@ async fn main() {
         set_camera(&camera);
 
         // カメラへ描画
-        {
-            let images = images.lock().await;
-            for ((rx, rz), img) in images.iter() {
-                let dest_x = rx * 512;
-                let dest_y = rz * 512;
-                draw_texture(*img, dest_x as f32, dest_y as f32, WHITE);
-            }
+        for ((rx, rz), img) in state.images() {
+            let dest_x = rx * 512;
+            let dest_y = rz * 512;
+            draw_texture(*img, dest_x as f32, dest_y as f32, WHITE);
         }
 
         set_default_camera();
