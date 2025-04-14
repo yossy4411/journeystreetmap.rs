@@ -20,7 +20,7 @@ async fn main() {
 
     let images_clone = images.clone();
 
-    runtime.spawn(async {
+    let handle = runtime.spawn(async {
         map::load_images(images_clone).await.expect("Failed to load images");
     });
 

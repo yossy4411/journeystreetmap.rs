@@ -82,7 +82,7 @@ pub async fn load_images(images: Arc<Mutex<HashMap<(i32, i32), Texture2D>>>) -> 
 }
 
 async fn buffer_region(mut region: Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> ((i32, i32), Vec<u8>) {
-    let mut image_data = [RGB::default(); 512 * 512];
+    let mut image_data = Box::new([RGB::default(); 512 * 512]);
     for i in 0..=31 {
         for j in 0..=31 {
             let chunk_result = JourneyMapReader::get_chunk(&mut region, i, j).await;
