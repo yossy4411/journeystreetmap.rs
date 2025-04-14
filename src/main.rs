@@ -5,7 +5,16 @@ use egui_macroquad::egui;
 use tokio::runtime::Runtime;
 use crate::map::{JourneyMapViewerState};
 
-#[macroquad::main("journeystreetmap")]
+
+fn conf() -> Conf {
+    Conf {
+        window_title: "journeystreetmap".to_string(),
+        sample_count: 4,
+        ..Default::default()
+    }
+}
+
+#[macroquad::main(conf)]
 async fn main() {
     let mut state = JourneyMapViewerState::default();
 
@@ -148,15 +157,21 @@ async fn main() {
                 let gx = wx - wx.rem_euclid(512.0);
                 for i in 0..=(screen_blocks / 512.0).x as i32 {
                     let x = gx + i as f32 * 512.0;
-                    draw_line(x, 0.0, x, screen_height(), 0.003 / camera.zoom.x, WHITE);
+                    draw_rectangle(x, 0.0, 0.1, screen_height(), WHITE);
                 }
             }
             if zoom_xy >= 2.0 {
                 let wx = screen_origin.x;
                 let gx = wx - wx.rem_euclid(16.0);
+                let width = match zoom_xy {
+                    2.0 ..= 4.0 => 0.6,
+                    4.0 ..= 8.0 => 0.5,
+                    _ => 0.7,
+                };
                 for i in 0..=(screen_blocks / 16.0).x as i32 {
                     let x = gx + i as f32 * 16.0;
-                    draw_line(x, 0.0, x, screen_height(), 0.001 / camera.zoom.x, GRAY);
+                    let x = x.floor();
+                    draw_rectangle(x, 0.0, width, screen_height(), GRAY);
                 }
             }
         }
