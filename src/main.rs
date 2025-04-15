@@ -160,16 +160,21 @@ async fn main() {
             let screen_origin = camera.screen_to_world(vec2(0.0, 0.0));
             let screen_blocks = camera.screen_to_world(vec2(screen_width(), screen_height())) - screen_origin;
 
-            let gx = screen_origin.x - screen_origin.x.rem_euclid(16.0);
-            for i in 0..=(screen_blocks / 16.0).x as i32 {
-                let x = gx + i as f32 * 16.0;
+            let gx = screen_origin.x - screen_origin.x.rem_euclid(1.0);
+            for i in 0..=screen_blocks.x as i32 + 1 {
+                let x = gx + i as f32;
                 let x = x.floor();
                 let point = camera.world_to_screen(vec2(x, 0.0));
 
                 if x % 512.0 == 0.0 {
+                    // Regionの境界
                     draw_line(point.x, 0.0, point.x, screen_height(), 2.0, WHITE);
-                } else if zoom_xy >= 4.0 {
+                } else if zoom_xy >= 4.0 && x % 16.0 == 0.0 {
+                    // Chunkの境界
                     draw_line(point.x, 0.0, point.x, screen_height(), 1.0, GRAY);
+                } else if zoom_xy >= 16.0 {
+                    // Blockの境界
+                    draw_line(point.x, 0.0, point.x, screen_height(), 1.0, Color::new(1.0, 1.0, 1.0, 0.2));
                 }
             }
         }
