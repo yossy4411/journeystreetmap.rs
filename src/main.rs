@@ -147,35 +147,6 @@ async fn main() {
             draw_texture(*img, dest_x as f32, dest_y as f32, WHITE);
         }
 
-
-        {
-            let screen_origin = camera.screen_to_world(vec2(0.0, 0.0));
-            let screen_blocks = camera.screen_to_world(vec2(screen_width(), screen_height())) - screen_origin;
-            // グリッドの表示
-            {
-                let wx = screen_origin.x;
-                let gx = wx - wx.rem_euclid(512.0);
-                for i in 0..=(screen_blocks / 512.0).x as i32 {
-                    let x = gx + i as f32 * 512.0;
-                    draw_rectangle(x, 0.0, 0.1, screen_height(), WHITE);
-                }
-            }
-            if zoom_xy >= 2.0 {
-                let wx = screen_origin.x;
-                let gx = wx - wx.rem_euclid(16.0);
-                let width = match zoom_xy {
-                    2.0 ..= 4.0 => 0.6,
-                    4.0 ..= 8.0 => 0.5,
-                    _ => 0.7,
-                };
-                for i in 0..=(screen_blocks / 16.0).x as i32 {
-                    let x = gx + i as f32 * 16.0;
-                    let x = x.floor();
-                    draw_rectangle(x, 0.0, width, screen_height(), GRAY);
-                }
-            }
-        }
-
         // マウスとかの描画
         let mouse_pos = camera.screen_to_world(mouse_position);
         let block_x = mouse_pos.x.floor();
@@ -183,6 +154,33 @@ async fn main() {
         draw_rectangle(block_x, block_y, 1.0, 1.0, Color::new(1.0, 0.0, 0.0, 0.5));
 
         set_default_camera();
+
+        {
+            let screen_origin = camera.screen_to_world(vec2(0.0, 0.0));
+            let screen_blocks = camera.screen_to_world(vec2(screen_width(), screen_height())) - screen_origin;
+            // グリッドの表示
+
+            {
+                let gx = screen_origin.x - screen_origin.x.rem_euclid(512.0);
+                for i in 0..=(screen_blocks / 512.0).x as i32 + 1 {
+                    let x = gx + i as f32 * 512.0;
+                    let x = x.floor();
+                    let point = camera.world_to_screen(vec2(x, 0.0));
+                    draw_line(point.x, 0.0, point.x, screen_height(), 2.0, WHITE);
+                }
+            }
+
+            if zoom_xy >= 2.5 {
+                let gx = screen_origin.x - screen_origin.x.rem_euclid(16.0);
+                for i in 0..=(screen_blocks / 16.0).x as i32 {
+                    let x = gx + i as f32 * 16.0;
+                    let x = x.floor();
+                    let point = camera.world_to_screen(vec2(x, 0.0));
+                    draw_line(point.x, 0.0, point.x, screen_height(), 1.0, GRAY);
+                }
+            }
+        }
+
         draw_text("Hello macroquad!", 20.0, 40.0, 30.0, DARKGRAY);
 
 
