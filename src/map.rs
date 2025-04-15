@@ -45,7 +45,7 @@ pub struct JourneyMapViewerState {
     path: Vec<(f32, f32)>,
 }
 
-pub async fn load_images(images: Arc<Mutex<HashMap<(i32, i32), Texture2D>>>) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn load_images(images: Arc<Mutex<Vec<((i32, i32), Box<[u8;512*512*4]>)>>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut reader = JourneyMapReader::new("/home/okayu/.local/share/ModrinthApp/profiles/Fabulously Optimized/journeymap/data/mp/160~251~235~246/");
     let region_offset_x = 0;
     let region_offset_z = 0;
@@ -73,15 +73,14 @@ pub async fn load_images(images: Arc<Mutex<HashMap<(i32, i32), Texture2D>>>) -> 
     }
 
     for thr in threads {
-        let (key, content) = thr.await.unwrap();
-        let texture = Texture2D::from_rgba8(512, 512, &content);
-        images.lock().await.insert(key, texture);  // 画像を保存
+        let obj = thr.await.unwrap();
+        images.lock().await.push(obj);  // 画像を保存
     }
     println!("Time taken: {:?}", stopwatch.elapsed());
     Ok(())
 }
 
-async fn buffer_region(mut region: Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> ((i32, i32), Vec<u8>) {
+async fn buffer_region(mut region: Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> ((i32, i32), Box<[u8;512 * 512 * 4]>) {
     let mut image_data = Box::new([RGB::default(); 512 * 512]);
     for i in 0..=31 {
         for j in 0..=31 {
@@ -118,13 +117,13 @@ async fn buffer_region(mut region: Region<File>, region_offset_x: i32, region_of
             }
         }
     }
-    let mut colors = Vec::with_capacity(512 * 512 * 4);  // RGBA8
+    let mut colors = Box::new([0_u8; 512 * 512 * 4]);  // RGBA8
     for i in 0..512 * 512 {
         let color = image_data[i];
-        colors.push(color.r);
-        colors.push(color.g);
-        colors.push(color.b);
-        colors.push(255); // Alpha
+        colors[i * 4] = color.r;
+        colors[i * 4 + 1] = color.g;
+        colors[i * 4 + 2] = color.b;
+        colors[i * 4 + 3] = 255; // Alpha
     }
     ((region_x, region_z), colors)
 }

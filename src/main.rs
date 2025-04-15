@@ -22,14 +22,15 @@ fn conf() -> Conf {
 async fn main() {
     let mut state = JourneyMapViewerState::default();
 
-    let mut images = Arc::new(Mutex::new(HashMap::new()));
+    let mut images = Arc::new(Mutex::new(Vec::new()));
+    let mut textures = HashMap::new();
 
     // 画像を読み込む
     let runtime = runtime::Builder::new_multi_thread().worker_threads(4).enable_all().build().unwrap();
 
     let images_clone = images.clone();
 
-    let handle = runtime.spawn(async {
+    runtime.spawn(async {
         map::load_images(images_clone).await.expect("Failed to load images");
     });
 
@@ -151,8 +152,17 @@ async fn main() {
 
         // カメラへ描画
         {
-            let images = images.lock().await;
-            for ((rx, rz), img) in images.iter() {
+            {
+                let mut images = images.lock().await;
+
+                if let Some(elem) = images.first() {
+                    let pos = elem.0;
+                    let texture = Texture2D::from_rgba8(512, 512, &*elem.1);
+                    textures.insert(pos, texture);
+                    images.remove(0);
+                }
+            }
+            for ((rx, rz), img) in textures.iter() {
                 let dest_x = rx * 512;
                 let dest_y = rz * 512;
                 draw_texture(*img, dest_x as f32, dest_y as f32, WHITE);
