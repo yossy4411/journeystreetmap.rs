@@ -160,17 +160,24 @@ async fn main() {
             let screen_origin = camera.screen_to_world(vec2(0.0, 0.0));
             let screen_blocks = camera.screen_to_world(vec2(screen_width(), screen_height())) - screen_origin;
 
-            let gx = screen_origin.x - screen_origin.x.rem_euclid(1.0);
-            let gy = screen_origin.y - screen_origin.y.rem_euclid(1.0);
+            let delta = match zoom_xy {
+                0.0..0.5 => 1024.0,
+                0.5..1.0 => 512.0,
+                1.0..3.0 => 16.0,
+                _ => 1.0,
+            };
 
-            for i in 0..=screen_blocks.x as i32 + 1 {
-                let x = gx + i as f32;
+            let gx = screen_origin.x - screen_origin.x.rem_euclid(delta);
+            let gy = screen_origin.y - screen_origin.y.rem_euclid(delta);
+
+            for i in 0..=(screen_blocks.x / delta) as i32 + 1 {
+                let x = gx + i as f32 * delta;
                 let x = x.floor();
                 let point = camera.world_to_screen(vec2(x, 0.0));
 
                 if x % 512.0 == 0.0 {
                     // Regionの境界
-                    draw_line(point.x, 0.0, point.x, screen_height(), 2.0, WHITE);
+                    draw_line(point.x, 0.0, point.x, screen_height(), 1.0, WHITE);
                 } else if zoom_xy >= 3.0 && x % 16.0 == 0.0 {
                     // Chunkの境界
                     draw_line(point.x, 0.0, point.x, screen_height(), 1.0, GRAY);
@@ -180,14 +187,14 @@ async fn main() {
                 }
             }
 
-            for i in 0..=screen_blocks.y as i32 + 1 {
-                let y = gy + i as f32;
+            for i in 0..=(screen_blocks.y / delta) as i32 + 1 {
+                let y = gy + i as f32 * delta;
                 let y = y.floor();
                 let point = camera.world_to_screen(vec2(0.0, y));
 
                 if y % 512.0 == 0.0 {
                     // Regionの境界
-                    draw_line(0.0, point.y, screen_width(), point.y, 2.0, WHITE);
+                    draw_line(0.0, point.y, screen_width(), point.y, 1.0, WHITE);
                 } else if zoom_xy >= 3.0 && y % 16.0 == 0.0 {
                     // Chunkの境界
                     draw_line(0.0, point.y, screen_width(), point.y, 1.0, GRAY);
