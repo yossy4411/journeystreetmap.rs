@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 serde = { version = "1.0.219", features = ["derive"] }
-tokio = { version = "1.44", default-features = false, features = ["fs", "rt", "rt-multi-thread"] }
+tokio = { version = "1.44", default-features = false, features = ["fs", "rt", "rt-multi-thread", "sync"] }
 fastanvil = { git = "https://github.com/yossy4411/fastnbt-async.git", rev = "73323c1945e9fc1139eff9d0807821b7ba364d68", version = "0.31.0" }
 fastnbt = "2.5.0"
 egui = "0.31"
