@@ -53,8 +53,7 @@ pub async fn load_images(images: Arc<Mutex<Vec<((i32, i32), Box<[u8;512*512*4]>)
     let stopwatch = std::time::Instant::now();
 
     let mut threads = Vec::new();
-    let regions = // reader.get_regions_list();
-        [(-1, -1), (0, -1), (1, -1), (-1, 0), (0, 0), (1, 0), (-1, 1), (0, 1), (1, 1)];
+    let regions = reader.get_regions_list().await;
 
     for (i, (region_x, region_z)) in regions.into_iter().enumerate() {
         let region = reader.try_read_region(region_offset_x + region_x, region_offset_z + region_z).await;
@@ -66,9 +65,6 @@ pub async fn load_images(images: Arc<Mutex<Vec<((i32, i32), Box<[u8;512*512*4]>)
         } else {
             println!("Region not found");
             continue;
-        }
-        if i > 20 {
-            break;
         }
     }
 
