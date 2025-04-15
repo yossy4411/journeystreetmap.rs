@@ -47,6 +47,9 @@ impl JourneyMapReader {
         let mut entries = tokio::fs::read_dir(path).await.expect("Failed to read directory");
         while let Some(entry) = entries.next_entry().await.transpose() {
             let entry = entry.expect("Failed to read entry");
+            if entry.metadata().await.unwrap().len() == 0 {
+                continue;   // 空っぽファイルはいらないよ
+            }
             let path = entry.path();
             let filename = path.file_name().unwrap().to_str().unwrap();
             if filename.starts_with("r.") && filename.ends_with(".mca") {
