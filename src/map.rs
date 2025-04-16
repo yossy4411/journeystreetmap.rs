@@ -7,6 +7,7 @@ use tokio::fs::File;
 use macroquad::math::{Vec2};
 use macroquad::prelude::Texture2D;
 use tokio::sync::Mutex;
+use tokio::task::JoinSet;
 use journeystreetmap::journeymap::biome::RGB;
 
 #[derive(Debug, Clone)]
@@ -52,25 +53,28 @@ pub async fn load_images(images: Arc<Mutex<Vec<((i32, i32), Box<[u8;512*512*4]>)
 
     let stopwatch = std::time::Instant::now();
 
-    let mut threads = Vec::new();
+    let mut threads = JoinSet::new();
     let regions = reader.get_regions_list().await;
 
-    for (i, (region_x, region_z)) in regions.into_iter().enumerate() {
+    for (region_x, region_z) in regions.into_iter() {
         let region = reader.try_read_region(region_offset_x + region_x, region_offset_z + region_z).await;
         if region.is_some() {
-            let thr = tokio::spawn(async move {
+            threads.spawn(async move {
                 buffer_region(region.unwrap(), region_offset_x, region_offset_z, region_x, region_z).await
             });
-            threads.push(thr);
+            if let Some(Ok(obj)) = threads.try_join_next() {
+                images.lock().await.push(obj);
+            }
         } else {
             println!("Region not found");
             continue;
         }
     }
 
-    for thr in threads {
-        let obj = thr.await.unwrap();
-        images.lock().await.push(obj);  // 画像を保存
+    while let Some(result) = threads.join_next().await {
+        if let Ok(obj) = result {
+            images.lock().await.push(obj);  // 画像を保存
+        }
     }
     println!("Time taken: {:?}", stopwatch.elapsed());
     Ok(())
