@@ -7,7 +7,7 @@ use egui_macroquad::egui;
 use tokio::runtime;
 use tokio::runtime::Runtime;
 use tokio::sync::Mutex;
-use crate::map::{JourneyMapViewerState};
+use crate::map::{EditingType, JourneyMapViewerState};
 
 
 fn conf() -> Conf {
@@ -65,6 +65,8 @@ async fn main() {
     let mut cursor_in_ui = false;
     let mut clicked = false;
 
+    let mut path_points = Vec::new();
+
     loop {
         // eguiの定義
         egui_macroquad::ui(|egui_ctx| {
@@ -98,10 +100,37 @@ async fn main() {
         // macroquadの描画処理
         clear_background(LIGHTGRAY);
 
+
+
         // マウスの処理
+        let shifted = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+        let mouse_position = mouse_position().into();
         if !cursor_in_ui && is_mouse_button_down(MouseButton::Left) {
-            // マウスが押下されたとき
-            clicked = true;
+            if !shifted {
+                // マウスが押下されたとき
+                clicked = true;
+            }
+        }
+        if !cursor_in_ui && is_mouse_button_pressed(MouseButton::Left) && shifted {
+            // Shiftが押下されているとき、挿入などの操作を行う
+            match state.editing_mode() {
+                map::EditingMode::Insert => {
+                    // 挿入処理
+                    println!("挿入処理");
+                    let pos = camera.screen_to_world(mouse_position);
+                    let pos = pos.floor();
+                    path_points.push(pos);
+                }
+                map::EditingMode::Delete => {
+                    // 削除処理
+                    println!("削除処理");
+                }
+                map::EditingMode::Select => {
+                    // 選択処理
+                    println!("選択処理");
+                }
+                _ => {}
+            }
         }
         if is_mouse_button_released(MouseButton::Left) {
             // マウスが離されたとき
@@ -113,7 +142,7 @@ async fn main() {
             camera.target += delta / vec2(camera.zoom.x, -camera.zoom.y);
         }
 
-        let mouse_position = mouse_position().into();
+
         // ホイールの処理
         if !cursor_in_ui {
             let before_zoom = camera.screen_to_world(mouse_position);
@@ -223,6 +252,23 @@ async fn main() {
                 } else if zoom_xy >= 16.0 {
                     // Blockの境界
                     draw_line(0.0, point.y, screen_width(), point.y, 1.0, Color::new(1.0, 1.0, 1.0, 0.2));
+                }
+            }
+
+            // 現在編集中のパスを描画
+            if path_points.len() > 1 {
+                let first = path_points.first().unwrap();
+                let mut first_scr = camera.world_to_screen(*first);
+                for p in path_points.iter().skip(1) {
+                    let a = camera.world_to_screen(*p);
+                    draw_line(a.x, a.y, first_scr.x, first_scr.y, 1.0, BLUE);
+                    first_scr = a;
+                }
+                if state.editing_type() == EditingType::Fill {
+                    // 最初と最後をつなごう
+                    let last = camera.world_to_screen(*path_points.last().unwrap());
+                    let first = camera.world_to_screen(*first);
+                    draw_line(first.x, first.y, last.x, last.y, 1.0, BLUE);
                 }
             }
         }

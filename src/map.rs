@@ -54,7 +54,8 @@ pub async fn load_images(images: Arc<Mutex<Vec<((i32, i32), Box<[u8;512*512*4]>)
     let stopwatch = std::time::Instant::now();
 
     let mut threads = JoinSet::new();
-    let regions = reader.get_regions_list().await;
+    let regions = // reader.get_regions_list().await;
+    vec![(0,0)];
 
     for (region_x, region_z) in regions.into_iter() {
         let region = reader.try_read_region(region_offset_x + region_x, region_offset_z + region_z).await;
