@@ -34,6 +34,8 @@ async fn main() {
         map::load_images(images_clone).await.expect("Failed to load images");
     });
 
+    let mut title_text = String::from("タイトル");
+
 
     // macroquadの初期化
     egui_macroquad::cfg(|egui_ctx| {
@@ -89,9 +91,22 @@ async fn main() {
                     ui.label(format!("編集モード: {}（{}）", mode_str, type_str));
                 }
 
+                match state.editing_mode() {
+                    map::EditingMode::Insert => {
+                        match state.editing_type() {
+                            map::EditingType::Stroke => {
+                                ui.label(format!("{} の頂点が選択されました", path_points.len()));
 
-                if ui.button("ボタン牡丹ぼたん").clicked() {
-                    println!("ボタンが押されたよ！");
+                                ui.label("タイトル: ");
+                                ui.text_edit_singleline(&mut title_text);
+                            }
+                            _ => {}
+                        }
+
+                    }
+                    _ => {
+                        ui.label("Shiftを押しながらクリックで挿入");
+                    }
                 }
             });
             cursor_in_ui = egui_ctx.is_pointer_over_area();
@@ -264,10 +279,16 @@ async fn main() {
                     draw_line(a.x, a.y, first_scr.x, first_scr.y, 1.0, BLUE);
                     first_scr = a;
                 }
+                let mut last = camera.world_to_screen(*path_points.last().unwrap());
+                let first = camera.world_to_screen(*first);
+                if is_key_down(KeyCode::RightShift) || is_key_down(KeyCode::LeftShift) {
+                    // Shiftが押下されているとき、最後の点を移動
+                    let last2 = mouse_position;
+                    draw_line(last.x, last.y, last2.x, last2.y, 1.0, BLUE);
+                    last = last2;
+                }
                 if state.editing_type() == EditingType::Fill {
                     // 最初と最後をつなごう
-                    let last = camera.world_to_screen(*path_points.last().unwrap());
-                    let first = camera.world_to_screen(*first);
                     draw_line(first.x, first.y, last.x, last.y, 1.0, BLUE);
                 }
             }
