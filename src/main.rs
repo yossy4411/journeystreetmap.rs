@@ -1,306 +1,67 @@
 mod map;
 
-use std::collections::HashMap;
-use std::sync::Arc;
-use macroquad::prelude::*;
-use egui_macroquad::egui;
-use tokio::runtime;
-use tokio::runtime::Runtime;
-use tokio::sync::Mutex;
-use crate::map::{EditingType, JourneyMapViewerState};
+use bevy::app::App;
+use bevy::prelude::*;
+use bevy::render::camera::Viewport;
+use bevy::window::PrimaryWindow;
+use bevy_egui::{EguiContextPass, EguiContexts, EguiPlugin};
+use bevy_egui::egui_node::EguiBevyPaintCallback;
 
-
-fn conf() -> Conf {
-    Conf {
-        window_title: "journeystreetmap".to_string(),
-        sample_count: 4,
-        ..Default::default()
-    }
+#[derive(Debug, Clone, Default, Resource)]
+struct MyApp {
+    title: String,
 }
 
-#[macroquad::main(conf)]
-async fn main() {
-    let mut state = JourneyMapViewerState::default();
+fn main() {
+    App::new()
+        .add_plugins(DefaultPlugins)
+        .add_plugins(EguiPlugin { enable_multipass_for_primary_context: true })
+        .init_resource::<MyApp>()
+        .add_systems(
+            Startup,
+            setup,
+        )
+        .add_systems(EguiContextPass, ui_system)
+        .run();
+}
 
-    let mut images = Arc::new(Mutex::new(Vec::new()));
-    let mut textures = HashMap::new();
-
-    // 画像を読み込む
-    let runtime = runtime::Builder::new_multi_thread().worker_threads(4).enable_all().build().unwrap();
-
-    let images_clone = images.clone();
-
-    runtime.spawn(async {
-        map::load_images(images_clone).await.expect("Failed to load images");
+fn ui_system(
+    mut camera: Single<&mut Camera>,
+    mut contexts: EguiContexts,
+    mut ui_state: ResMut<MyApp>,
+    window: Single<&mut Window, With<PrimaryWindow>>,
+) {
+    egui::CentralPanel::default().show(contexts.ctx_mut(), |ui| {
+        ui.label("Hello, world!");
+        if ui.button("Click me!").clicked() {
+            println!("Button clicked!");
+        }
+        ui.text_edit_singleline(&mut ui_state.as_mut().title)
     });
 
-    let mut title_text = String::from("タイトル");
+    let pos = UVec2::new(0, 0);
+    let size = UVec2::new(window.physical_width(), window.physical_height());
 
-
-    // macroquadの初期化
-    egui_macroquad::cfg(|egui_ctx| {
-        // ウィンドウの影の設定
-        let style = egui_ctx.style();
-        let mut new_style = style.as_ref().clone();
-        new_style.visuals.window_shadow.extrusion = 10.0;
-        egui_ctx.set_style(new_style);
-
-        // フォントの設定
-        let mut font_definitions = egui::FontDefinitions::default();
-        font_definitions.font_data.insert(
-            "Noto Sans JP".to_string(),
-            egui::FontData::from_static(include_bytes!("../fonts/NotoSansJP-Regular.ttf"))
-        );
-        font_definitions.families.insert(
-            egui::FontFamily::Proportional,
-            vec!["Noto Sans JP".to_string()]
-        );
-
-        egui_ctx.set_fonts(font_definitions);
+    camera.viewport = Some(Viewport {
+        physical_position: pos,
+        physical_size: size,
+        ..default()
     });
-
-    let mut camera = Camera2D::default();
-    camera.zoom = vec2(1.0 / screen_width(), -1.0 / screen_height());
-
-    let mut zoom_xy = 1.0;
-
-    let mut cursor_in_ui = false;
-    let mut clicked = false;
-
-    let mut path_points = Vec::new();
-
-    loop {
-        // eguiの定義
-        egui_macroquad::ui(|egui_ctx| {
-            egui::Window::new("JourneyStreetMap Editor").show(egui_ctx, |ui| {
-
-                if state.editing_mode() == map::EditingMode::View {
-                    ui.label("編集モード: 表示");
-                } else {
-                    let mode_str = match state.editing_mode() {
-                        map::EditingMode::Insert => "挿入",
-                        map::EditingMode::Delete => "削除",
-                        map::EditingMode::Select => "選択",
-                        map::EditingMode::View => "表示",
-                    };
-                    let type_str = match state.editing_type() {
-                        map::EditingType::Stroke => "線",
-                        map::EditingType::Fill => "塗り",
-                        map::EditingType::Poi => "場所",
-                    };
-                    ui.label(format!("編集モード: {}（{}）", mode_str, type_str));
-                }
-
-                match state.editing_mode() {
-                    map::EditingMode::Insert => {
-                        match state.editing_type() {
-                            map::EditingType::Stroke => {
-                                ui.label(format!("{} の頂点が選択されました", path_points.len()));
-
-                                ui.label("タイトル: ");
-                                ui.text_edit_singleline(&mut title_text);
-                            }
-                            _ => {}
-                        }
-
-                    }
-                    _ => {
-                        ui.label("Shiftを押しながらクリックで挿入");
-                    }
-                }
-            });
-            cursor_in_ui = egui_ctx.is_pointer_over_area();
-        });
-
-        // macroquadの描画処理
-        clear_background(LIGHTGRAY);
+}
 
 
+fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
+    // カメラを追加（これがないと何も表示されない）
+    commands.spawn(Camera2d);
 
-        // マウスの処理
-        let shifted = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
-        let mouse_position = mouse_position().into();
-        if !cursor_in_ui && is_mouse_button_down(MouseButton::Left) {
-            if !shifted {
-                // マウスが押下されたとき
-                clicked = true;
-            }
-        }
-        if !cursor_in_ui && is_mouse_button_pressed(MouseButton::Left) && shifted {
-            // Shiftが押下されているとき、挿入などの操作を行う
-            match state.editing_mode() {
-                map::EditingMode::Insert => {
-                    // 挿入処理
-                    println!("挿入処理");
-                    let pos = camera.screen_to_world(mouse_position);
-                    let pos = pos.floor();
-                    path_points.push(pos);
-                }
-                map::EditingMode::Delete => {
-                    // 削除処理
-                    println!("削除処理");
-                }
-                map::EditingMode::Select => {
-                    // 選択処理
-                    println!("選択処理");
-                }
-                _ => {}
-            }
-        }
-        if is_mouse_button_released(MouseButton::Left) {
-            // マウスが離されたとき
-            clicked = false;
-        }
-
-        let delta = mouse_delta_position();
-        if clicked {
-            camera.target += delta / vec2(camera.zoom.x, -camera.zoom.y);
-        }
-
-
-        // ホイールの処理
-        if !cursor_in_ui {
-            let before_zoom = camera.screen_to_world(mouse_position);
-
-            let delta = mouse_wheel().1;
-            if delta != 0.0 {
-                let factor = 1.3f32.powf(delta);
-                camera.zoom *= factor;
-                zoom_xy *= factor;
-                let after_zoom = camera.screen_to_world(mouse_position);
-                camera.target += before_zoom - after_zoom;
-            }
-        }
-
-        // キーボードの処理
-        // 編集モードの切り替え
-        if is_key_pressed(KeyCode::I) {
-            state.set_editing_mode(map::EditingMode::Insert);
-        }
-        if is_key_pressed(KeyCode::D) {
-            state.set_editing_mode(map::EditingMode::Delete);
-        }
-        if is_key_pressed(KeyCode::S) {
-            state.set_editing_mode(map::EditingMode::Select);
-        }
-        if is_key_pressed(KeyCode::V) {
-            state.set_editing_mode(map::EditingMode::View);
-        }
-
-        if is_key_pressed(KeyCode::E) {
-            // 編集の種別を切り替え
-            state.toggle_editing_type();
-        }
-
-        set_camera(&camera);
-
-        // カメラへ描画
-        {
-            {
-                let mut images = images.lock().await;
-
-                if let Some(elem) = images.first() {
-                    let pos = elem.0;
-                    let texture = Texture2D::from_rgba8(512, 512, &*elem.1);
-                    textures.insert(pos, texture);
-                    images.remove(0);
-                }
-            }
-            for ((rx, rz), img) in textures.iter() {
-                let dest_x = rx * 512;
-                let dest_y = rz * 512;
-                draw_texture(*img, dest_x as f32, dest_y as f32, WHITE);
-            }
-        }
-
-        // マウスとかの描画
-        let mouse_pos = camera.screen_to_world(mouse_position);
-        let block_x = mouse_pos.x.floor();
-        let block_y = mouse_pos.y.floor();
-        draw_rectangle(block_x, block_y, 1.0, 1.0, Color::new(1.0, 0.0, 0.0, 0.5));
-
-        set_default_camera();
-
-        {
-            // グリッドの表示
-            let screen_origin = camera.screen_to_world(vec2(0.0, 0.0));
-            let screen_blocks = camera.screen_to_world(vec2(screen_width(), screen_height())) - screen_origin;
-
-            let delta = match zoom_xy {
-                0.0..0.5 => 1024.0,
-                0.5..1.0 => 512.0,
-                1.0..3.0 => 16.0,
-                _ => 1.0,
-            };
-
-            let gx = screen_origin.x - screen_origin.x.rem_euclid(delta);
-            let gy = screen_origin.y - screen_origin.y.rem_euclid(delta);
-
-            for i in 0..=(screen_blocks.x / delta) as i32 + 1 {
-                let x = gx + i as f32 * delta;
-                let x = x.floor();
-                let point = camera.world_to_screen(vec2(x, 0.0));
-
-                if x % 512.0 == 0.0 {
-                    // Regionの境界
-                    draw_line(point.x, 0.0, point.x, screen_height(), 1.0, WHITE);
-                } else if zoom_xy >= 3.0 && x % 16.0 == 0.0 {
-                    // Chunkの境界
-                    draw_line(point.x, 0.0, point.x, screen_height(), 1.0, GRAY);
-                } else if zoom_xy >= 16.0 {
-                    // Blockの境界
-                    draw_line(point.x, 0.0, point.x, screen_height(), 1.0, Color::new(1.0, 1.0, 1.0, 0.2));
-                }
-            }
-
-            for i in 0..=(screen_blocks.y / delta) as i32 + 1 {
-                let y = gy + i as f32 * delta;
-                let y = y.floor();
-                let point = camera.world_to_screen(vec2(0.0, y));
-
-                if y % 512.0 == 0.0 {
-                    // Regionの境界
-                    draw_line(0.0, point.y, screen_width(), point.y, 1.0, WHITE);
-                } else if zoom_xy >= 3.0 && y % 16.0 == 0.0 {
-                    // Chunkの境界
-                    draw_line(0.0, point.y, screen_width(), point.y, 1.0, GRAY);
-                } else if zoom_xy >= 16.0 {
-                    // Blockの境界
-                    draw_line(0.0, point.y, screen_width(), point.y, 1.0, Color::new(1.0, 1.0, 1.0, 0.2));
-                }
-            }
-
-            // 現在編集中のパスを描画
-            if path_points.len() > 1 {
-                let first = path_points.first().unwrap();
-                let mut first_scr = camera.world_to_screen(*first);
-                for p in path_points.iter().skip(1) {
-                    let a = camera.world_to_screen(*p);
-                    draw_line(a.x, a.y, first_scr.x, first_scr.y, 1.0, BLUE);
-                    first_scr = a;
-                }
-                let mut last = camera.world_to_screen(*path_points.last().unwrap());
-                let first = camera.world_to_screen(*first);
-                if is_key_down(KeyCode::RightShift) || is_key_down(KeyCode::LeftShift) {
-                    // Shiftが押下されているとき、最後の点を移動
-                    let last2 = mouse_position;
-                    draw_line(last.x, last.y, last2.x, last2.y, 1.0, BLUE);
-                    last = last2;
-                }
-                if state.editing_type() == EditingType::Fill {
-                    // 最初と最後をつなごう
-                    draw_line(first.x, first.y, last.x, last.y, 1.0, BLUE);
-                }
-            }
-        }
-
-        draw_text("Hello macroquad!", 20.0, 40.0, 30.0, DARKGRAY);
-
-
-        // 描画更新
-        egui_macroquad::draw();
-
-        // next
-        next_frame().await;
-    }
+    // 円
+    commands.spawn((
+        Mesh2d(meshes.add(Circle::new(50.))),
+        MeshMaterial2d(materials.add(ColorMaterial::from_color(Color::srgb(0.2, 0.1, 0.0)))),
+        Transform::from_translation(Vec3::new(-150., 0., 0.)),
+    ));
 }
