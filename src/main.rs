@@ -32,7 +32,7 @@ fn ui_system(
     mut window: Single<&mut Window, With<PrimaryWindow>>,
 ) {
     let ctx = contexts.ctx_mut();
-    bevy_egui::egui::CentralPanel::default().show(ctx, |ui| {
+    bevy_egui::egui::Window::new("Editor").show(ctx, |ui| {
         ui.label("Hello, world!");
         if ui.button("Click me!").clicked() {
             println!("Button clicked!");
