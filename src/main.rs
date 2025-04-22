@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use bevy::render::camera::Viewport;
 use bevy::window::PrimaryWindow;
 use bevy_egui::{EguiContextPass, EguiContexts, EguiPlugin};
-use bevy_egui::egui_node::EguiBevyPaintCallback;
+use bevy_egui::egui::TextEdit;
 
 #[derive(Debug, Clone, Default, Resource)]
 struct MyApp {
@@ -15,7 +15,7 @@ struct MyApp {
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugins(EguiPlugin { enable_multipass_for_primary_context: true })
+        .add_plugins(EguiPlugin { enable_multipass_for_primary_context: false })
         .init_resource::<MyApp>()
         .add_systems(
             Startup,
@@ -29,23 +29,15 @@ fn ui_system(
     mut camera: Single<&mut Camera>,
     mut contexts: EguiContexts,
     mut ui_state: ResMut<MyApp>,
-    window: Single<&mut Window, With<PrimaryWindow>>,
+    mut window: Single<&mut Window, With<PrimaryWindow>>,
 ) {
-    egui::CentralPanel::default().show(contexts.ctx_mut(), |ui| {
+    let ctx = contexts.ctx_mut();
+    bevy_egui::egui::CentralPanel::default().show(ctx, |ui| {
         ui.label("Hello, world!");
         if ui.button("Click me!").clicked() {
             println!("Button clicked!");
         }
-        ui.text_edit_singleline(&mut ui_state.as_mut().title)
-    });
-
-    let pos = UVec2::new(0, 0);
-    let size = UVec2::new(window.physical_width(), window.physical_height());
-
-    camera.viewport = Some(Viewport {
-        physical_position: pos,
-        physical_size: size,
-        ..default()
+        ui.text_edit_singleline(&mut ui_state.as_mut().title);
     });
 }
 
@@ -54,7 +46,9 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    mut window: Query<&mut Window>,
 ) {
+    window.single_mut().unwrap().ime_enabled = true;
     // カメラを追加（これがないと何も表示されない）
     commands.spawn(Camera2d);
 
@@ -65,3 +59,4 @@ fn setup(
         Transform::from_translation(Vec3::new(-150., 0., 0.)),
     ));
 }
+    
