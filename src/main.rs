@@ -58,5 +58,12 @@ fn setup(
         MeshMaterial2d(materials.add(ColorMaterial::from_color(Color::srgb(0.2, 0.1, 0.0)))),
         Transform::from_translation(Vec3::new(-150., 0., 0.)),
     ));
+
+    // 四角
+    commands.spawn((
+        Mesh2d(meshes.add(Rectangle::new(100., 100.))),
+        MeshMaterial2d(materials.add(ColorMaterial::from_color(Color::srgb(0.0, 0.1, 0.2)))),
+        Transform::from_translation(Vec3::new(150., 0., 0.)),
+    ));
 }
     
