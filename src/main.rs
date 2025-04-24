@@ -1,15 +1,57 @@
 mod map;
 
-use bevy::app::App;
+use bevy::app::{plugin_group, App};
 use bevy::prelude::*;
-use bevy::render::camera::Viewport;
 use bevy::window::PrimaryWindow;
 use bevy_egui::{EguiContextPass, EguiContexts, EguiPlugin};
-use bevy_egui::egui::TextEdit;
 
 #[derive(Debug, Clone, Default, Resource)]
 struct MyApp {
     title: String,
+}
+
+plugin_group! {
+    /// This plugin group will add all the default plugins for a *Bevy* application:
+    pub struct DefaultPlugins {
+        bevy::app:::PanicHandlerPlugin,
+        bevy::log:::LogPlugin,
+        bevy::app:::TaskPoolPlugin,
+        bevy::diagnostic:::FrameCountPlugin,
+        bevy::time:::TimePlugin,
+        bevy::transform:::TransformPlugin,
+        bevy::diagnostic:::DiagnosticsPlugin,
+        bevy::input:::InputPlugin,
+        bevy::app:::ScheduleRunnerPlugin,
+        bevy::window:::WindowPlugin,
+        bevy::a11y:::AccessibilityPlugin,
+        bevy::app:::TerminalCtrlCHandlerPlugin,
+        bevy::asset:::AssetPlugin,
+        bevy::scene:::ScenePlugin,
+        bevy::winit:::WinitPlugin,
+        bevy::render:::RenderPlugin,
+        bevy::render::texture:::ImagePlugin,
+        bevy::render::pipelined_rendering:::PipelinedRenderingPlugin,
+        bevy::core_pipeline:::CorePipelinePlugin,
+        bevy::sprite:::SpritePlugin,
+        bevy::text:::TextPlugin,
+        bevy::ui:::UiPlugin,
+        bevy::pbr:::PbrPlugin,
+        bevy::gltf:::GltfPlugin,
+        bevy::audio:::AudioPlugin,
+        bevy::gilrs:::GilrsPlugin,
+        bevy::animation:::AnimationPlugin,
+        bevy::gizmos:::GizmoPlugin,
+        bevy::state::app:::StatesPlugin,
+        #[plugin_group]
+        bevy::picking:::DefaultPickingPlugins,
+    }
+    /// [`DefaultPlugins`] obeys *Cargo* *feature* flags. Users may exert control over this plugin group
+    /// by disabling `default-features` in their `Cargo.toml` and enabling only those features
+    /// that they wish to use.
+    ///
+    /// [`DefaultPlugins`] contains all the plugins typically required to build
+    /// a *Bevy* application which includes a *window* and presentation components.
+    /// For the absolute minimum number of plugins needed to run a Bevy application, see [`MinimalPlugins`].
 }
 
 fn main() {
