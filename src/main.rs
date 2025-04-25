@@ -94,28 +94,11 @@ fn ui_system(
 
 fn setup(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
     mut window: Query<&mut Window>,
 ) {
     window.single_mut().unwrap().ime_enabled = true;
     // カメラを追加（これがないと何も表示されない）
     commands.spawn(Camera2d);
-
-    // 円
-    commands.spawn((
-        Mesh2d(meshes.add(Circle::new(50.))),
-        MeshMaterial2d(materials.add(ColorMaterial::from_color(Color::srgb(0.2, 0.1, 0.0)))),
-        Transform::from_translation(Vec3::new(-150., 0., 0.)),
-    ));
-
-    // 四角
-    commands.spawn((
-        Mesh2d(meshes.add(Rectangle::new(100., 100.))),
-        MeshMaterial2d(materials.add(ColorMaterial::from_color(Color::srgb(0.0, 0.1, 0.2)))),
-        Transform::from_translation(Vec3::new(150., 0., 0.)),
-    ));
-
 }
 
 fn update(mut commands: Commands, myapp: Res<MyApp>, mut assets: ResMut<Assets<Image>>) {
@@ -125,7 +108,7 @@ fn update(mut commands: Commands, myapp: Res<MyApp>, mut assets: ResMut<Assets<I
         let sprite = Sprite::from_image(image_handle);
         commands.spawn((
             sprite,
-            Transform::from_xyz(region_x as f32 * 512.0, 0., region_z as f32 * 512.0),  
+            Transform::from_xyz(region_x as f32 * 512.0, 0., region_z as f32 * 512.0),
         ));
     }
 }
