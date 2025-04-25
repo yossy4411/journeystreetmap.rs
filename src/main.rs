@@ -10,43 +10,37 @@ struct MyApp {
     title: String,
 }
 
-plugin_group! {
-    /// This plugin group will add all the default plugins for a *Bevy* application:
-    pub struct DefaultPlugins {
-        bevy::app:::PanicHandlerPlugin,
-        bevy::app:::TaskPoolPlugin,
-        bevy::diagnostic:::FrameCountPlugin,
-        bevy::time:::TimePlugin,
-        bevy::transform:::TransformPlugin,
-        bevy::input:::InputPlugin,
-        bevy::app:::ScheduleRunnerPlugin,
-        bevy::window:::WindowPlugin,
-        bevy::a11y:::AccessibilityPlugin,
-        bevy::app:::TerminalCtrlCHandlerPlugin,
-        bevy::asset:::AssetPlugin,
-        bevy::scene:::ScenePlugin,
-        bevy::winit:::WinitPlugin,
-        bevy::render:::RenderPlugin,
-        bevy::render::texture:::ImagePlugin,
-        bevy::render::pipelined_rendering:::PipelinedRenderingPlugin,
-        bevy::core_pipeline:::CorePipelinePlugin,
-        bevy::sprite:::SpritePlugin,
-        bevy::state::app:::StatesPlugin,
-        #[plugin_group]
-        bevy::picking:::DefaultPickingPlugins,
-    }
-    /// [`DefaultPlugins`] obeys *Cargo* *feature* flags. Users may exert control over this plugin group
-    /// by disabling `default-features` in their `Cargo.toml` and enabling only those features
-    /// that they wish to use.
-    ///
-    /// [`DefaultPlugins`] contains all the plugins typically required to build
-    /// a *Bevy* application which includes a *window* and presentation components.
-    /// For the absolute minimum number of plugins needed to run a Bevy application, see [`MinimalPlugins`].
-}
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins((
+            bevy::app::PanicHandlerPlugin,
+            bevy::app::TaskPoolPlugin::default(),
+            bevy::diagnostic::FrameCountPlugin,
+            bevy::time::TimePlugin,
+            bevy::transform::TransformPlugin,
+        ))
+        .add_plugins((
+            bevy::input::InputPlugin,
+            bevy::app::ScheduleRunnerPlugin::default(),
+            bevy::window::WindowPlugin::default(),
+            bevy::a11y::AccessibilityPlugin,
+            bevy::app::TerminalCtrlCHandlerPlugin,
+        ))
+        .add_plugins((
+            bevy::asset::AssetPlugin::default(),
+            bevy::scene::ScenePlugin,
+            bevy::winit::WinitPlugin::<bevy::winit::WakeUp>::default(),
+            bevy::render::RenderPlugin::default(),
+            bevy::render::texture::ImagePlugin::default(),
+        ))
+        .add_plugins((
+            bevy::render::pipelined_rendering::PipelinedRenderingPlugin,
+            bevy::core_pipeline::CorePipelinePlugin,
+            bevy::sprite::SpritePlugin,
+            bevy::state::app::StatesPlugin,
+            bevy::picking::DefaultPickingPlugins,
+        ))
         .add_plugins(EguiPlugin { enable_multipass_for_primary_context: false })
         .init_resource::<MyApp>()
         .add_systems(
