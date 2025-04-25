@@ -51,7 +51,6 @@ fn main() {
             bevy::render::pipelined_rendering::PipelinedRenderingPlugin,
             bevy::core_pipeline::CorePipelinePlugin,
             bevy::sprite::SpritePlugin,
-            bevy::state::app::StatesPlugin,
             bevy::picking::DefaultPickingPlugins,
         ))
         .add_plugins(EguiPlugin { enable_multipass_for_primary_context: false })
