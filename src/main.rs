@@ -14,12 +14,10 @@ plugin_group! {
     /// This plugin group will add all the default plugins for a *Bevy* application:
     pub struct DefaultPlugins {
         bevy::app:::PanicHandlerPlugin,
-        bevy::log:::LogPlugin,
         bevy::app:::TaskPoolPlugin,
         bevy::diagnostic:::FrameCountPlugin,
         bevy::time:::TimePlugin,
         bevy::transform:::TransformPlugin,
-        bevy::diagnostic:::DiagnosticsPlugin,
         bevy::input:::InputPlugin,
         bevy::app:::ScheduleRunnerPlugin,
         bevy::window:::WindowPlugin,
@@ -33,14 +31,6 @@ plugin_group! {
         bevy::render::pipelined_rendering:::PipelinedRenderingPlugin,
         bevy::core_pipeline:::CorePipelinePlugin,
         bevy::sprite:::SpritePlugin,
-        bevy::text:::TextPlugin,
-        bevy::ui:::UiPlugin,
-        bevy::pbr:::PbrPlugin,
-        bevy::gltf:::GltfPlugin,
-        bevy::audio:::AudioPlugin,
-        bevy::gilrs:::GilrsPlugin,
-        bevy::animation:::AnimationPlugin,
-        bevy::gizmos:::GizmoPlugin,
         bevy::state::app:::StatesPlugin,
         #[plugin_group]
         bevy::picking:::DefaultPickingPlugins,
