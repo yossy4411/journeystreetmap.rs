@@ -6,6 +6,7 @@ use journeystreetmap::journeymap::{biome, JourneyMapReader};
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::sync::Mutex;
+use bevy::prelude::Resource;
 use tokio::fs::File;
 use tokio::task::JoinSet;
 
@@ -14,8 +15,19 @@ use tokio::task::JoinSet;
 struct MouseHandling {
     zoom: f32,
     zoom_factor: f32,
-    position: Vec2,
-    pressed: bool,
+    translation: Vec2,
+    last_mouse_pos: Vec2,
+}
+
+impl Default for MouseHandling {
+    fn default() -> Self {
+        Self {
+            zoom: 1.0,
+            zoom_factor: 1.3,
+            translation: Vec2::ZERO,
+            last_mouse_pos: Vec2::ZERO,
+        }
+    }
 }
 
 #[derive(Eq, PartialEq, Hash, Copy, Clone, Debug, Default)]
@@ -37,12 +49,13 @@ pub enum EditingType {
     Poi,    // ポイント（村、都市、交差点...）
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Resource)]
 pub struct JourneyMapViewerState {
     edit_mode: EditingMode,
     editing_type: EditingType,
     editable: bool,
     path: Vec<(f32, f32)>,
+    mouse_handling: MouseHandling,
 }
 
 pub const EXTENT_SIZE: Extent3d = Extent3d {
@@ -135,6 +148,19 @@ async fn buffer_region(mut region: Region<File>, region_offset_x: i32, region_of
 }
 
 impl JourneyMapViewerState {
+    /// クリック
+    pub fn clicked(&mut self, pos: Vec2) {
+        self.mouse_handling.last_mouse_pos = pos;
+    }
+
+    /// マウスのドラッグの処理
+    pub fn dragging(&mut self, pos: Vec2) -> Vec2 {
+        let mut d = (pos - self.mouse_handling.last_mouse_pos) / self.mouse_handling.zoom;
+        self.mouse_handling.last_mouse_pos = pos;
+        d.x = -d.x;  // xを反転する
+        d
+    }
+
     pub fn editing_type(&self) -> EditingType {
         self.editing_type
     }
