@@ -5,7 +5,8 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use bevy::math::Vec2;
 use tokio::fs::File;
-use tokio::sync::Mutex;
+use std::sync::Mutex;
+use bevy::render::render_resource::Extent3d;
 use tokio::task::JoinSet;
 use journeystreetmap::journeymap::biome::RGB;
 
@@ -45,6 +46,12 @@ pub struct JourneyMapViewerState {
     path: Vec<(f32, f32)>,
 }
 
+pub const EXTENT_SIZE: Extent3d = Extent3d {
+    width: 512,
+    height: 512,
+    depth_or_array_layers: 1,
+};
+
 pub async fn load_images(images: Arc<Mutex<Vec<((i32, i32), Box<[u8;512*512*4]>)>>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut reader = JourneyMapReader::new("/home/okayu/.local/share/ModrinthApp/profiles/Fabulously Optimized/journeymap/data/mp/160~251~235~246/");
     let region_offset_x = 0;
@@ -63,7 +70,7 @@ pub async fn load_images(images: Arc<Mutex<Vec<((i32, i32), Box<[u8;512*512*4]>)
                 buffer_region(region.unwrap(), region_offset_x, region_offset_z, region_x, region_z).await
             });
             if let Some(Ok(obj)) = threads.try_join_next() {
-                images.lock().await.push(obj);
+                images.lock().as_mut().unwrap().push(obj);
             }
         } else {
             println!("Region not found");
@@ -73,7 +80,7 @@ pub async fn load_images(images: Arc<Mutex<Vec<((i32, i32), Box<[u8;512*512*4]>)
 
     while let Some(result) = threads.join_next().await {
         if let Ok(obj) = result {
-            images.lock().await.push(obj);  // 画像を保存
+            images.lock().as_mut().unwrap().push(obj);  // 画像を保存
         }
     }
     println!("Time taken: {:?}", stopwatch.elapsed());

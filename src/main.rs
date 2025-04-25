@@ -3,18 +3,35 @@ mod map;
 use std::sync::Arc;
 use bevy::app::{plugin_group, App};
 use bevy::prelude::*;
+use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::window::PrimaryWindow;
 use bevy_egui::{EguiContextPass, EguiContexts, EguiPlugin};
 use bevy_egui::egui::{FontData, FontDefinitions, FontFamily};
 use bevy_egui::render_systems::EguiPass;
+use std::sync::Mutex;
+use bevy::asset::RenderAssetUsages;
+use crate::map::load_images;
 
 #[derive(Debug, Clone, Default, Resource)]
 struct MyApp {
     title: String,
+    images: Arc<Mutex<Vec<((i32, i32), Box<[u8;512*512*4]>)>>>,
 }
 
 
 fn main() {
+    let runner = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .enable_all()
+        .build().expect("Failed to create runtime");
+    
+    let myapp = MyApp::default();
+    let arc_clone = myapp.images.clone();
+    runner.spawn(async { 
+        load_images(arc_clone).await.expect("Failed to load images");
+    });
+    
+    
     App::new()
         .add_plugins(MinimalPlugins)
         .add_plugins((
@@ -40,10 +57,14 @@ fn main() {
             bevy::picking::DefaultPickingPlugins,
         ))
         .add_plugins(EguiPlugin { enable_multipass_for_primary_context: false })
-        .init_resource::<MyApp>()
+        .insert_resource(myapp)
         .add_systems(
             Startup,
             (setup, ui_setup)
+        )
+        .add_systems(
+            Update,
+            update,
         )
         .add_systems(EguiContextPass, ui_system)
         .run();
@@ -97,5 +118,17 @@ fn setup(
         MeshMaterial2d(materials.add(ColorMaterial::from_color(Color::srgb(0.0, 0.1, 0.2)))),
         Transform::from_translation(Vec3::new(150., 0., 0.)),
     ));
+
 }
-    
+
+fn update(mut commands: Commands, mut myapp: ResMut<MyApp>, mut assets: ResMut<Assets<Image>>) {
+    for ((region_x, region_z), colors) in myapp.images.lock().as_mut().unwrap().drain(..) {
+        let image = Image::new_fill(map::EXTENT_SIZE, TextureDimension::D2, colors.as_ref(), TextureFormat::Rgba8UnormSrgb, RenderAssetUsages::RENDER_WORLD);
+        let image_handle = assets.as_mut().add(image);
+        let sprite = Sprite::from_image(image_handle);
+        commands.spawn((
+            sprite,
+            Transform::from_xyz(region_x as f32 * 512.0, 0., region_z as f32 * 512.0),  
+        ));
+    }
+}
