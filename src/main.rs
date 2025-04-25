@@ -1,9 +1,12 @@
 mod map;
 
+use std::sync::Arc;
 use bevy::app::{plugin_group, App};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_egui::{EguiContextPass, EguiContexts, EguiPlugin};
+use bevy_egui::egui::{FontData, FontDefinitions, FontFamily};
+use bevy_egui::render_systems::EguiPass;
 
 #[derive(Debug, Clone, Default, Resource)]
 struct MyApp {
@@ -13,12 +16,10 @@ struct MyApp {
 
 fn main() {
     App::new()
+        .add_plugins(MinimalPlugins)
         .add_plugins((
-            MinimalPlugins,
             bevy::app::PanicHandlerPlugin,
             bevy::transform::TransformPlugin,
-        ))
-        .add_plugins((
             bevy::input::InputPlugin,
             bevy::window::WindowPlugin::default(),
             bevy::a11y::AccessibilityPlugin,
@@ -42,10 +43,18 @@ fn main() {
         .init_resource::<MyApp>()
         .add_systems(
             Startup,
-            setup,
+            (setup, ui_setup)
         )
         .add_systems(EguiContextPass, ui_system)
         .run();
+}
+
+fn ui_setup(mut contexts: EguiContexts) {
+    let ctx_mut = contexts.ctx_mut();
+    let mut fonts = FontDefinitions::default();
+    fonts.font_data.insert("Noto Sans JP".to_string(), Arc::new(FontData::from_static(include_bytes!("../fonts/NotoSansJP-Regular.ttf"))));
+    fonts.families.insert(FontFamily::Proportional, vec!["Noto Sans JP".to_string()]);
+    ctx_mut.set_fonts(fonts);
 }
 
 fn ui_system(
