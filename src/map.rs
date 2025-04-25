@@ -1,14 +1,13 @@
+use bevy::math::Vec2;
+use bevy::render::render_resource::Extent3d;
 use fastanvil::asyncio::Region;
+use journeystreetmap::journeymap::biome::RGB;
 use journeystreetmap::journeymap::{biome, JourneyMapReader};
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
-use bevy::math::Vec2;
-use tokio::fs::File;
 use std::sync::Mutex;
-use bevy::render::render_resource::Extent3d;
+use tokio::fs::File;
 use tokio::task::JoinSet;
-use journeystreetmap::journeymap::biome::RGB;
 
 #[derive(Debug, Clone)]
 /// 画像の状態を管理する構造体

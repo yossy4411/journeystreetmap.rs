@@ -1,16 +1,14 @@
 mod map;
 
-use std::sync::Arc;
-use bevy::app::{plugin_group, App};
-use bevy::prelude::*;
-use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use bevy::window::PrimaryWindow;
-use bevy_egui::{EguiContextPass, EguiContexts, EguiPlugin};
-use bevy_egui::egui::{FontData, FontDefinitions, FontFamily};
-use bevy_egui::render_systems::EguiPass;
-use std::sync::Mutex;
-use bevy::asset::RenderAssetUsages;
 use crate::map::load_images;
+use bevy::app::App;
+use bevy::asset::RenderAssetUsages;
+use bevy::prelude::*;
+use bevy::render::render_resource::{TextureDimension, TextureFormat};
+use bevy_egui::egui::{FontData, FontDefinitions, FontFamily};
+use bevy_egui::{EguiContextPass, EguiContexts, EguiPlugin};
+use std::sync::Arc;
+use std::sync::Mutex;
 
 #[derive(Debug, Clone, Default, Resource)]
 struct MyApp {
@@ -79,10 +77,9 @@ fn ui_setup(mut contexts: EguiContexts) {
 }
 
 fn ui_system(
-    mut camera: Single<&mut Camera>,
+    // mut camera: Single<&mut Camera>,
     mut contexts: EguiContexts,
     mut ui_state: ResMut<MyApp>,
-    mut window: Single<&mut Window, With<PrimaryWindow>>,
 ) {
     let ctx = contexts.ctx_mut();
     bevy_egui::egui::Window::new("Editor").show(ctx, |ui| {
@@ -121,7 +118,7 @@ fn setup(
 
 }
 
-fn update(mut commands: Commands, mut myapp: ResMut<MyApp>, mut assets: ResMut<Assets<Image>>) {
+fn update(mut commands: Commands, myapp: Res<MyApp>, mut assets: ResMut<Assets<Image>>) {
     for ((region_x, region_z), colors) in myapp.images.lock().as_mut().unwrap().drain(..) {
         let image = Image::new_fill(map::EXTENT_SIZE, TextureDimension::D2, colors.as_ref(), TextureFormat::Rgba8UnormSrgb, RenderAssetUsages::RENDER_WORLD);
         let image_handle = assets.as_mut().add(image);
