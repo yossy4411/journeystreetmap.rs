@@ -9,10 +9,8 @@ tokio = { version = "1.44", default-features = false, features = ["fs", "rt", "r
 fastanvil = { git = "https://github.com/yossy4411/fastnbt-async.git", rev = "73323c1945e9fc1139eff9d0807821b7ba364d68", version = "0.31.0" }
 fastnbt = "2.5.0"
 
-eframe = { version = "0.31", features = ["wgpu"] }
 bevy_egui = { version = "0.34.0-rc", features = ["immutable_ctx"] }
-bevy = { version = "0.16.0-rc", features = ["bevy_image", "bevy_window", "bevy_asset"] }
-bevy_egui_ime = "0.1.4"
+bevy = "0.16.0-rc"
 
 [lib]
 name = "journeystreetmap"
