@@ -14,15 +14,12 @@ struct MyApp {
 fn main() {
     App::new()
         .add_plugins((
+            MinimalPlugins,
             bevy::app::PanicHandlerPlugin,
-            bevy::app::TaskPoolPlugin::default(),
-            bevy::diagnostic::FrameCountPlugin,
-            bevy::time::TimePlugin,
             bevy::transform::TransformPlugin,
         ))
         .add_plugins((
             bevy::input::InputPlugin,
-            bevy::app::ScheduleRunnerPlugin::default(),
             bevy::window::WindowPlugin::default(),
             bevy::a11y::AccessibilityPlugin,
             bevy::app::TerminalCtrlCHandlerPlugin,
