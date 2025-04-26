@@ -13,18 +13,14 @@ use tokio::task::JoinSet;
 #[derive(Debug, Clone)]
 /// 画像の状態を管理する構造体
 struct MouseHandling {
-    zoom: f32,
     zoom_factor: f32,
-    translation: Vec2,
     last_mouse_pos: Vec2,
 }
 
 impl Default for MouseHandling {
     fn default() -> Self {
         Self {
-            zoom: 1.0,
             zoom_factor: 1.3,
-            translation: Vec2::ZERO,
             last_mouse_pos: Vec2::ZERO,
         }
     }
@@ -155,7 +151,7 @@ impl JourneyMapViewerState {
 
     /// マウスのドラッグの処理
     pub fn dragging(&mut self, pos: Vec2) -> Vec2 {
-        let mut d = (pos - self.mouse_handling.last_mouse_pos) / self.mouse_handling.zoom;
+        let mut d = pos - self.mouse_handling.last_mouse_pos;
         self.mouse_handling.last_mouse_pos = pos;
         d.x = -d.x;  // xを反転する
         d

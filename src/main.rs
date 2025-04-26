@@ -1,6 +1,5 @@
 mod map;
 
-use std::ops::Add;
 use crate::map::{load_images, JourneyMapViewerState};
 use bevy::app::App;
 use bevy::asset::RenderAssetUsages;
@@ -11,7 +10,6 @@ use bevy_egui::{EguiContextPass, EguiContexts, EguiPlugin};
 use std::sync::Arc;
 use std::sync::Mutex;
 use bevy::input::mouse::MouseWheel;
-use bevy::tasks::futures_lite::StreamExt;
 
 #[derive(Debug, Clone, Default, Resource)]
 struct MyApp {
@@ -127,7 +125,7 @@ fn update(
     }
     let state_ref = state.as_mut();
     if mouse_button.just_pressed(MouseButton::Left) {
-        let mut window = windows.single_mut().unwrap();
+        let window = windows.single_mut().unwrap();
         if let Some(a) = window.cursor_position() {
             state_ref.clicked(a);
         };
