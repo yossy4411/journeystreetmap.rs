@@ -1,5 +1,3 @@
-use tiny_skia::Color;
-
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RGB {
     pub r: u8,
@@ -17,12 +15,6 @@ impl RGB {
         let g = (self.g as f32 * alpha + other.g as f32 * (1.0 - alpha)).round() as u8;
         let b = (self.b as f32 * alpha + other.b as f32 * (1.0 - alpha)).round() as u8;
         RGB::new(r, g, b)
-    }
-}
-
-impl Into<Color> for RGB {
-    fn into(self) -> Color {
-        Color::from_rgba8(self.r, self.g, self.b, 255)
     }
 }
 

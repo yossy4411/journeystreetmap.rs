@@ -1,7 +1,8 @@
-use fastanvil::Region;
+use fastanvil::asyncio::Region;
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::fs::File;
+use tokio::fs::File;
+use tokio::io::{AsyncRead, AsyncSeek};
 
 pub mod biome;
 mod decoration;
@@ -40,11 +41,15 @@ impl JourneyMapReader {
         }
     }
 
-    pub fn get_regions_list(&self) -> Vec<(i32, i32)> {
+    pub async fn get_regions_list(&self) -> Vec<(i32, i32)> {
         let mut regions = Vec::new();
         let path = std::path::Path::new(&self.origin).join("overworld/cache");
-        for entry in path.read_dir().expect("Failed to read directory") {
+        let mut entries = tokio::fs::read_dir(path).await.expect("Failed to read directory");
+        while let Some(entry) = entries.next_entry().await.transpose() {
             let entry = entry.expect("Failed to read entry");
+            if entry.metadata().await.unwrap().len() == 0 {
+                continue;   // 空っぽファイルはいらないよ
+            }
             let path = entry.path();
             let filename = path.file_name().unwrap().to_str().unwrap();
             if filename.starts_with("r.") && filename.ends_with(".mca") {
@@ -57,25 +62,25 @@ impl JourneyMapReader {
         regions
     }
 
-    pub fn read_region(&mut self, x: i32, z: i32) -> Result<Region<File>, Box<dyn std::error::Error>> {
+    pub async fn read_region(&mut self, x: i32, z: i32) -> Result<Region<File>, Box<dyn std::error::Error>> {
         let filename = self.origin.clone() + &format!("overworld/cache/r.{}.{}.mca", x, z);
-        let stream = File::open(filename)?;
-        let region = Region::from_stream(stream)?;
+        let stream = File::open(filename).await?;
+        let region = Region::from_stream(stream).await?;
         Ok(region)
     }
 
-    pub fn try_read_region(&mut self, x: i32, z: i32) -> Option<Region<File>> {
+    pub async fn try_read_region(&mut self, x: i32, z: i32) -> Option<Region<File>> {
         let filename = self.origin.clone() + &format!("overworld/cache/r.{}.{}.mca", x, z);
         if !std::path::Path::new(&filename).exists() {
             return None;
         }
-        let stream = File::open(filename);
+        let stream = File::open(filename).await;
         match stream {
             Ok(stream) => {
-                if stream.metadata().unwrap().len() == 0 {
+                if stream.metadata().await.unwrap().len() == 0 {
                     return None;   // 空っぽファイルはいらないよ
                 }
-                match Region::from_stream(stream) {
+                match Region::from_stream(stream).await {
                     Ok(region) => {
                         Some(region)
                     }
@@ -88,9 +93,9 @@ impl JourneyMapReader {
         }
     }
 
-    pub fn get_chunk<T>(region: &mut Region<T>, x: usize, z: usize) -> Result<Option<Chunk>, Box<dyn std::error::Error>>
-    where T: std::io::Read + std::io::Seek {
-        let chunk = region.read_chunk(x, z)?.ok_or("Chunk not found")?;
+    pub async fn get_chunk<T>(region: &mut Region<T>, x: usize, z: usize) -> Result<Option<Chunk>, Box<dyn std::error::Error>>
+    where T: AsyncRead + AsyncSeek + Unpin {
+        let chunk = region.read_chunk(x, z).await?.ok_or("Chunk not found")?;
 
         // let parsed: fastnbt::error::Result<Chunk> = fastnbt::from_bytes(chunk.unwrap().as_slice());
         let parsed: fastnbt::error::Result<Chunk> = fastnbt::from_bytes(&chunk);
