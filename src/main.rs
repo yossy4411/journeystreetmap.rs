@@ -37,24 +37,24 @@ fn main() {
         .add_plugins(MinimalPlugins)
         .add_plugins((
             bevy::app::PanicHandlerPlugin,
-            bevy::transform::TransformPlugin,
+            TransformPlugin,
             bevy::input::InputPlugin,
-            bevy::window::WindowPlugin::default(),
+            WindowPlugin::default(),
             bevy::a11y::AccessibilityPlugin,
             bevy::app::TerminalCtrlCHandlerPlugin,
         ))
         .add_plugins((
-            bevy::asset::AssetPlugin::default(),
+            AssetPlugin::default(),
             bevy::scene::ScenePlugin,
             bevy::winit::WinitPlugin::<bevy::winit::WakeUp>::default(),
             bevy::render::RenderPlugin::default(),
-            bevy::render::texture::ImagePlugin::default_nearest(),
+            ImagePlugin::default_nearest(),
         ))
         .add_plugins((
             bevy::render::pipelined_rendering::PipelinedRenderingPlugin,
             bevy::core_pipeline::CorePipelinePlugin,
             bevy::sprite::SpritePlugin,
-            bevy::picking::DefaultPickingPlugins,
+            DefaultPickingPlugins,
         ))
         .add_plugins(EguiPlugin { enable_multipass_for_primary_context: false })
         .insert_resource(myapp)
