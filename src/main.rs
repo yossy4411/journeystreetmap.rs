@@ -10,6 +10,7 @@ use bevy_egui::{EguiContextPass, EguiContexts, EguiPlugin};
 use std::sync::Arc;
 use std::sync::Mutex;
 use bevy::input::mouse::MouseWheel;
+use bevy::render::RenderSet::Render;
 
 #[derive(Debug, Clone, Default, Resource)]
 struct MyApp {
@@ -106,6 +107,10 @@ fn ui_system(
         
         ui.label(format!("モード: {}", mode_str));
         ui.label(format!("編集の種別: {}", type_str));
+        
+        let blk = state.as_ref().mouse_block_pos;
+        ui.label(format!("マウス: {}, {}", blk.x, blk.y));
+        
         if ui.button("Click me!").clicked() {
             println!("Button clicked!");
         }
@@ -139,12 +144,12 @@ fn reading_image (
 ) {
     // ImageをWorldに落とし込む操作
     for ((region_x, region_z), colors) in myapp.images.lock().as_mut().unwrap().drain(..) {
-        let image = Image::new_fill(map::EXTENT_SIZE, TextureDimension::D2, colors.as_ref(), TextureFormat::Rgba8UnormSrgb, RenderAssetUsages::RENDER_WORLD);
+        let image = Image::new_fill(map::EXTENT_SIZE, TextureDimension::D2, colors.as_ref(), TextureFormat::Rgba8UnormSrgb, RenderAssetUsages::all());
         let image_handle = assets.as_mut().add(image);
         let sprite = Sprite::from_image(image_handle);
         commands.spawn((
             sprite,
-            Transform::from_xyz(region_x as f32 * 512.0, 0., region_z as f32 * 512.0),
+            Transform::from_xyz(256.5 + region_x as f32 * 512.0, -256.5 - region_z as f32 * 512.0, 0.),
         ));
         println!("Loaded region: ({}, {})", region_x, region_z);
     }
@@ -167,7 +172,8 @@ fn camera_handling(
         let center = window.size() / 2.0;
         let cursor_pos_world = Vec3::new(cursor_pos.x - center.x, center.y - cursor_pos.y, 0.);
         let pos = cam_mut.translation + cursor_pos_world * cam_mut.scale;
-        cursor.as_mut().translation = pos.floor();
+        state_ref.mouse_block_pos = pos.xy().floor();
+        cursor.as_mut().translation = pos.round();
 
         if mouse_button.just_pressed(MouseButton::Left) {
             {

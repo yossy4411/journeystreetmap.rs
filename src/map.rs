@@ -52,6 +52,7 @@ pub struct JourneyMapViewerState {
     editable: bool,
     path: Vec<(f32, f32)>,
     mouse_handling: MouseHandling,
+    pub mouse_block_pos: Vec2,
 }
 
 pub const EXTENT_SIZE: Extent3d = Extent3d {
