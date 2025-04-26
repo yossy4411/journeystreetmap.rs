@@ -9,7 +9,6 @@ use bevy_egui::egui::{FontData, FontDefinitions, FontFamily};
 use bevy_egui::{EguiContextPass, EguiContexts, EguiPlugin};
 use std::sync::Arc;
 use std::sync::Mutex;
-use bevy::input::keyboard::KeyboardInput;
 use bevy::input::mouse::MouseWheel;
 
 #[derive(Debug, Clone, Default, Resource)]
@@ -143,7 +142,7 @@ fn camera_handling(
     mut state: ResMut<JourneyMapViewerState>,
     mut camera: Single<&mut Transform, With<Camera2d>>,
     mut windows: Query<&mut Window>,
-    mut keys: EventReader<KeyboardInput>,
+    keys: Res<ButtonInput<KeyCode>>,
     mouse_button: Res<ButtonInput<MouseButton>>,
     mut mouse_wheel: EventReader<MouseWheel>,
 ) {
@@ -172,9 +171,8 @@ fn camera_handling(
         }
     }
 
-    let mut shifted = false;
-    for event in keys.read() {
-        match event.key_code {
+    for key in keys.get_just_pressed() {
+        match key {
             KeyCode::KeyE => {
                 state_ref.toggle_editing_type();
             }
@@ -194,17 +192,16 @@ fn camera_handling(
 
             }
         }
-        if event.key_code == KeyCode::ShiftLeft || event.key_code == KeyCode::ShiftRight {
-            shifted = true;
-        }
     }
 
-    if shifted {
+    if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
         if mouse_button.just_pressed(MouseButton::Left) {
             match state_ref.editing_mode() {
                 EditingMode::Insert => {
                     // 何かしらのインサート処理をする
-                    println!("インサートするぜ！！");
+                    if state_ref.editing_type() == EditingType::Fill || 
+                       state_ref.editing_type() == EditingType::Stroke {
+                    }
                 }
                 _ => {}
             }
