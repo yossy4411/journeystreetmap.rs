@@ -10,7 +10,10 @@ use bevy_egui::{EguiContextPass, EguiContexts, EguiPlugin};
 use std::sync::Arc;
 use std::sync::Mutex;
 use bevy::input::mouse::MouseWheel;
-use bevy::render::RenderSet::Render;
+use bevy_prototype_lyon::prelude::*;
+use bevy_prototype_lyon::prelude::tess::geom::Point;
+use bevy_prototype_lyon::prelude::tess::path::BuilderWithAttributes;
+use bevy_prototype_lyon::prelude::tess::path::path_buffer::Builder;
 
 #[derive(Debug, Clone, Default, Resource)]
 struct MyApp {
@@ -21,6 +24,11 @@ struct MyApp {
 #[derive(Component)]
 struct Cursor;
 
+#[derive(Component)]
+struct EditingPolygon;
+
+#[derive(Component)]
+struct EditingPolyline;
 
 fn main() {
     let runner = tokio::runtime::Builder::new_multi_thread()
@@ -107,10 +115,10 @@ fn ui_system(
         
         ui.label(format!("モード: {}", mode_str));
         ui.label(format!("編集の種別: {}", type_str));
-        
+
         let blk = state.as_ref().mouse_block_pos;
         ui.label(format!("マウス: {}, {}", blk.x, blk.y));
-        
+
         if ui.button("Click me!").clicked() {
             println!("Button clicked!");
         }
@@ -220,7 +228,9 @@ fn camera_handling(
                     EditingMode::Insert => {
                         // 何かしらのインサート処理をする
                         if state_ref.editing_type() == EditingType::Fill ||
-                            state_ref.editing_type() == EditingType::Stroke {}
+                            state_ref.editing_type() == EditingType::Stroke {
+                            state_ref.insert(state_ref.mouse_block_pos);
+                        }
                     }
                     _ => {}
                 }

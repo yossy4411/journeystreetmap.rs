@@ -184,4 +184,16 @@ impl JourneyMapViewerState {
     pub fn set_editing_mode(&mut self, editing_mode: EditingMode) {
         self.edit_mode = editing_mode;
     }
+    
+    pub fn insert(&mut self, pos: Vec2) {
+        self.path.push((pos.x, pos.y));
+    }
+    
+    pub fn delete(&mut self, pos: Vec2) {
+        self.path.retain(|&p| p != (pos.x, pos.y));
+    }
+    
+    pub fn get_path(&self) -> &Vec<(f32, f32)> {
+        &self.path
+    }
 }
