@@ -1,27 +1,244 @@
-mod journeymap;
+mod map;
+
+use crate::map::{load_images, EditingMode, EditingType, JourneyMapViewerState};
+use bevy::app::App;
+use bevy::asset::RenderAssetUsages;
+use bevy::prelude::*;
+use bevy::render::render_resource::{TextureDimension, TextureFormat};
+use bevy_egui::egui::{FontData, FontDefinitions, FontFamily};
+use bevy_egui::{EguiContextPass, EguiContexts, EguiPlugin};
+use std::sync::Arc;
+use std::sync::Mutex;
+use bevy::input::mouse::MouseWheel;
+use bevy_prototype_lyon::prelude::*;
+use bevy_prototype_lyon::prelude::tess::geom::Point;
+use bevy_prototype_lyon::prelude::tess::path::BuilderWithAttributes;
+use bevy_prototype_lyon::prelude::tess::path::path_buffer::Builder;
+
+#[derive(Debug, Clone, Default, Resource)]
+struct MyApp {
+    title: String,
+    images: Arc<Mutex<Vec<((i32, i32), Box<[u8;512*512*4]>)>>>,
+}
+
+#[derive(Component)]
+struct Cursor;
+
+#[derive(Component)]
+struct EditingPolygon;
+
+#[derive(Component)]
+struct EditingPolyline;
 
 fn main() {
-    let mut reader = journeymap::JourneyMapReader::new("/home/okayu/.local/share/ModrinthApp/profiles/Fabulously Optimized/journeymap/data/mp/160~251~235~246/");
-    reader.read_region(-1, -1).expect("Failed to read region");
+    let runner = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .enable_all()
+        .build().expect("Failed to create runtime");
+    
+    let myapp = MyApp::default();
+    let arc_clone = myapp.images.clone();
+    runner.spawn(async { 
+        load_images(arc_clone).await.expect("Failed to load images");
+    });
+    
+    
+    App::new()
+        .add_plugins(MinimalPlugins)
+        .add_plugins((
+            bevy::app::PanicHandlerPlugin,
+            TransformPlugin,
+            bevy::input::InputPlugin,
+            WindowPlugin::default(),
+            bevy::a11y::AccessibilityPlugin,
+            bevy::app::TerminalCtrlCHandlerPlugin,
+        ))
+        .add_plugins((
+            AssetPlugin::default(),
+            bevy::scene::ScenePlugin,
+            bevy::winit::WinitPlugin::<bevy::winit::WakeUp>::default(),
+            bevy::render::RenderPlugin::default(),
+            ImagePlugin::default_nearest(),
+        ))
+        .add_plugins((
+            bevy::render::pipelined_rendering::PipelinedRenderingPlugin,
+            bevy::core_pipeline::CorePipelinePlugin,
+            bevy::sprite::SpritePlugin,
+            DefaultPickingPlugins,
+        ))
+        .add_plugins(EguiPlugin { enable_multipass_for_primary_context: false })
+        .insert_resource(myapp)
+        .insert_resource(JourneyMapViewerState::default())
+        .add_systems(
+            Startup,
+            (setup, ui_setup)
+        )
+        .add_systems(
+            Update,
+            (
+                reading_image,
+                camera_handling,
+            )
+        )
+        .add_systems(EguiContextPass, ui_system)
+        .run();
+}
 
-    let stopwatch = std::time::Instant::now();
-    for i in 0..=31 {
-        for j in 0..=31 {
-            if let Ok(chunk) = reader.get_chunk(i, j) {
-                if chunk.is_none() {
-                    println!("Chunk not found");
-                    continue;
-                } let chunk = chunk.unwrap();
-                // println!("Chunk pos: {}", chunk.pos);
-                let mut vec = chunk.get_all_sorted();
-                for ((x, y), data) in vec {
-                    // println!("{}, {}: {:?}", x, y, data.biome_name);
+fn ui_setup(mut contexts: EguiContexts) {
+    let ctx_mut = contexts.ctx_mut();
+    let mut fonts = FontDefinitions::default();
+    fonts.font_data.insert("Noto Sans JP".to_string(), Arc::new(FontData::from_static(include_bytes!("../fonts/NotoSansJP-Regular.ttf"))));
+    fonts.families.insert(FontFamily::Proportional, vec!["Noto Sans JP".to_string()]);
+    ctx_mut.set_fonts(fonts);
+}
+
+fn ui_system(
+    // mut camera: Single<&mut Camera>,
+    mut contexts: EguiContexts,
+    mut ui_state: ResMut<MyApp>,
+    mut state: ResMut<JourneyMapViewerState>,
+) {
+    let ctx = contexts.ctx_mut();
+    bevy_egui::egui::Window::new("Editor").show(ctx, |ui| {
+        ui.label("Hello, world!");
+        let mode_str = match state.as_ref().editing_mode() {
+            EditingMode::Delete => "削除",
+            EditingMode::Insert => "挿入",
+            EditingMode::Select => "選択",
+            EditingMode::View => "閲覧",
+        };
+        let type_str = match state.as_ref().editing_type() {
+            EditingType::Fill => "塗りつぶし (建物ポリゴン)",
+            EditingType::Stroke => "線引き (道路など)",
+            EditingType::Poi => "POI (マーカー)",
+        };
+        
+        ui.label(format!("モード: {}", mode_str));
+        ui.label(format!("編集の種別: {}", type_str));
+
+        let blk = state.as_ref().mouse_block_pos;
+        ui.label(format!("マウス: {}, {}", blk.x, blk.y));
+
+        if ui.button("Click me!").clicked() {
+            println!("Button clicked!");
+        }
+        ui.text_edit_singleline(&mut ui_state.as_mut().title);
+    });
+}
+
+
+fn setup(
+    mut commands: Commands,
+    mut window: Query<&mut Window>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
+    window.single_mut().unwrap().ime_enabled = true;
+    // カメラを追加（これがないと何も表示されない）
+    commands.spawn(Camera2d);
+    commands.spawn((
+        Mesh2d(meshes.add(Rectangle::new(1.0, 1.0))),
+        MeshMaterial2d(materials.add(Color::srgba(1., 0., 0., 0.5))),
+        Transform::default(),
+        Cursor,
+    ));
+
+}
+
+fn reading_image (
+    mut commands: Commands,
+    myapp: Res<MyApp>,
+    mut assets: ResMut<Assets<Image>>,
+) {
+    // ImageをWorldに落とし込む操作
+    for ((region_x, region_z), colors) in myapp.images.lock().as_mut().unwrap().drain(..) {
+        let image = Image::new_fill(map::EXTENT_SIZE, TextureDimension::D2, colors.as_ref(), TextureFormat::Rgba8UnormSrgb, RenderAssetUsages::all());
+        let image_handle = assets.as_mut().add(image);
+        let sprite = Sprite::from_image(image_handle);
+        commands.spawn((
+            sprite,
+            Transform::from_xyz(256.5 + region_x as f32 * 512.0, -256.5 - region_z as f32 * 512.0, 0.),
+        ));
+        println!("Loaded region: ({}, {})", region_x, region_z);
+    }
+}
+
+fn camera_handling(
+    mut state: ResMut<JourneyMapViewerState>,
+    mut camera: Single<&mut Transform, (With<Camera2d>, Without<Cursor>)>,
+    mut cursor: Single<&mut Transform, (With<Cursor>, Without<Camera2d>)>,
+    mut windows: Query<&mut Window>,
+    keys: Res<ButtonInput<KeyCode>>,
+    mouse_button: Res<ButtonInput<MouseButton>>,
+    mut mouse_wheel: EventReader<MouseWheel>,
+) {
+    let state_ref = state.as_mut();
+    let window = windows.single_mut().unwrap();
+    let cam_mut = camera.as_mut();
+
+    if let Some(cursor_pos) = window.cursor_position() {
+        let center = window.size() / 2.0;
+        let cursor_pos_world = Vec3::new(cursor_pos.x - center.x, center.y - cursor_pos.y, 0.);
+        let pos = cam_mut.translation + cursor_pos_world * cam_mut.scale;
+        state_ref.mouse_block_pos = pos.xy().floor();
+        cursor.as_mut().translation = pos.round();
+
+        if mouse_button.just_pressed(MouseButton::Left) {
+            {
+                state_ref.clicked(cursor_pos);
+            };
+            println!("Left mouse button clicked!");
+        }
+
+        for event in mouse_wheel.read() {
+            let y = event.y;
+            let delta = state_ref.zoom(y);
+            let mut mouse_pos_rel = cursor_pos - center;
+            mouse_pos_rel.x = -mouse_pos_rel.x;
+            let scale = cam_mut.scale;
+            cam_mut.scale *= delta;
+            cam_mut.translation += (mouse_pos_rel * (delta - 1.0)).extend(0.) * scale;
+        }
+
+
+        for key in keys.get_just_pressed() {
+            match key {
+                KeyCode::KeyE => {
+                    state_ref.toggle_editing_type();
                 }
-            } else {
-                println!("Chunk load failed");
-                continue;
+                KeyCode::KeyI => {
+                    state_ref.set_editing_mode(EditingMode::Insert);
+                }
+                KeyCode::KeyD => {
+                    state_ref.set_editing_mode(EditingMode::Delete);
+                }
+                KeyCode::KeyS => {
+                    state_ref.set_editing_mode(EditingMode::Select);
+                }
+                KeyCode::KeyV => {
+                    state_ref.set_editing_mode(EditingMode::View);
+                }
+                _ => {}
             }
         }
+
+        if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
+            if mouse_button.just_pressed(MouseButton::Left) {
+                match state_ref.editing_mode() {
+                    EditingMode::Insert => {
+                        // 何かしらのインサート処理をする
+                        if state_ref.editing_type() == EditingType::Fill ||
+                            state_ref.editing_type() == EditingType::Stroke {
+                            state_ref.insert(state_ref.mouse_block_pos);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        } else if mouse_button.pressed(MouseButton::Left) {
+            let delta = state_ref.dragging(cursor_pos);
+            let scale = cam_mut.scale;
+            cam_mut.translation += delta.extend(0.) * scale;
+        }
     }
-    println!("Time taken: {:?}", stopwatch.elapsed());
 }
