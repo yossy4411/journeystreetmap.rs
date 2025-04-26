@@ -5,13 +5,9 @@ edition = "2024"
 
 [dependencies]
 serde = { version = "1.0.219", features = ["derive"] }
-tokio = { version = "1.44", default-features = false, features = ["fs", "rt", "rt-multi-thread", "sync"] }
+tokio = { version = "1.44", default-features = false, features = ["fs", "rt", "rt-multi-thread", "sync", "macros"] }
 fastanvil = { git = "https://github.com/yossy4411/fastnbt-async.git", rev = "73323c1945e9fc1139eff9d0807821b7ba364d68", version = "0.31.0" }
 fastnbt = "2.5.0"
-
-bevy_egui = { version = "0.34.0-rc", features = ["immutable_ctx"] }
-bevy = { version = "0.16.0-rc", default-features = false, features = ["bevy_asset", "bevy_window", "bevy_render", "bevy_core_pipeline", "bevy_sprite", "bevy_scene", "bevy_picking", "bevy_winit", "multi_threaded"] }
-bevy_prototype_lyon = "0.12.0"
 
 [lib]
 name = "journeystreetmap"
