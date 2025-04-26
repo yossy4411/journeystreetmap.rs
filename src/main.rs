@@ -17,6 +17,9 @@ struct MyApp {
     images: Arc<Mutex<Vec<((i32, i32), Box<[u8;512*512*4]>)>>>,
 }
 
+#[derive(Component)]
+struct Cursor;
+
 
 fn main() {
     let runner = tokio::runtime::Builder::new_multi_thread()
@@ -114,10 +117,19 @@ fn ui_system(
 fn setup(
     mut commands: Commands,
     mut window: Query<&mut Window>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     window.single_mut().unwrap().ime_enabled = true;
     // カメラを追加（これがないと何も表示されない）
     commands.spawn(Camera2d);
+    commands.spawn((
+        Mesh2d(meshes.add(Rectangle::new(1.0, 1.0))),
+        MeshMaterial2d(materials.add(Color::srgba(1., 0., 0., 0.5))),
+        Transform::default(),
+        Cursor,
+    ));
+
 }
 
 fn reading_image (
@@ -140,75 +152,74 @@ fn reading_image (
 
 fn camera_handling(
     mut state: ResMut<JourneyMapViewerState>,
-    mut camera: Single<&mut Transform, With<Camera2d>>,
+    mut camera: Single<&mut Transform, (With<Camera2d>, Without<Cursor>)>,
+    mut cursor: Single<&mut Transform, (With<Cursor>, Without<Camera2d>)>,
     mut windows: Query<&mut Window>,
     keys: Res<ButtonInput<KeyCode>>,
     mouse_button: Res<ButtonInput<MouseButton>>,
     mut mouse_wheel: EventReader<MouseWheel>,
 ) {
     let state_ref = state.as_mut();
-    if mouse_button.just_pressed(MouseButton::Left) {
-        let window = windows.single_mut().unwrap();
-        if let Some(a) = window.cursor_position() {
-            state_ref.clicked(a);
-        };
-        println!("Left mouse button clicked!");
-    }
+    let window = windows.single_mut().unwrap();
     let cam_mut = camera.as_mut();
 
-
-    for event in mouse_wheel.read() {
-        let y = event.y;
-        let delta = state_ref.zoom(y);
-        let window = windows.single().unwrap();
+    if let Some(cursor_pos) = window.cursor_position() {
         let center = window.size() / 2.0;
-        if let Some(cursor_pos) = window.cursor_position() {
+        let cursor_pos_world = Vec3::new(cursor_pos.x - center.x, center.y - cursor_pos.y, 0.);
+        let pos = cam_mut.translation + cursor_pos_world * cam_mut.scale;
+        cursor.as_mut().translation = pos.floor();
+
+        if mouse_button.just_pressed(MouseButton::Left) {
+            {
+                state_ref.clicked(cursor_pos);
+            };
+            println!("Left mouse button clicked!");
+        }
+
+        for event in mouse_wheel.read() {
+            let y = event.y;
+            let delta = state_ref.zoom(y);
             let mut mouse_pos_rel = cursor_pos - center;
             mouse_pos_rel.x = -mouse_pos_rel.x;
             let scale = cam_mut.scale;
             cam_mut.scale *= delta;
             cam_mut.translation += (mouse_pos_rel * (delta - 1.0)).extend(0.) * scale;
         }
-    }
 
-    for key in keys.get_just_pressed() {
-        match key {
-            KeyCode::KeyE => {
-                state_ref.toggle_editing_type();
-            }
-            KeyCode::KeyI => {
-                state_ref.set_editing_mode(EditingMode::Insert);
-            }
-            KeyCode::KeyD => {
-                state_ref.set_editing_mode(EditingMode::Delete);
-            }
-            KeyCode::KeyS => {
-                state_ref.set_editing_mode(EditingMode::Select);
-            }
-            KeyCode::KeyV => {
-                state_ref.set_editing_mode(EditingMode::View);
-            }
-            _ => {
 
-            }
-        }
-    }
-
-    if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
-        if mouse_button.just_pressed(MouseButton::Left) {
-            match state_ref.editing_mode() {
-                EditingMode::Insert => {
-                    // 何かしらのインサート処理をする
-                    if state_ref.editing_type() == EditingType::Fill || 
-                       state_ref.editing_type() == EditingType::Stroke {
-                    }
+        for key in keys.get_just_pressed() {
+            match key {
+                KeyCode::KeyE => {
+                    state_ref.toggle_editing_type();
+                }
+                KeyCode::KeyI => {
+                    state_ref.set_editing_mode(EditingMode::Insert);
+                }
+                KeyCode::KeyD => {
+                    state_ref.set_editing_mode(EditingMode::Delete);
+                }
+                KeyCode::KeyS => {
+                    state_ref.set_editing_mode(EditingMode::Select);
+                }
+                KeyCode::KeyV => {
+                    state_ref.set_editing_mode(EditingMode::View);
                 }
                 _ => {}
             }
         }
-    } else if mouse_button.pressed(MouseButton::Left) {
-        let window = windows.single().unwrap();
-        if let Some(cursor_pos) = window.cursor_position() {
+
+        if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
+            if mouse_button.just_pressed(MouseButton::Left) {
+                match state_ref.editing_mode() {
+                    EditingMode::Insert => {
+                        // 何かしらのインサート処理をする
+                        if state_ref.editing_type() == EditingType::Fill ||
+                            state_ref.editing_type() == EditingType::Stroke {}
+                    }
+                    _ => {}
+                }
+            }
+        } else if mouse_button.pressed(MouseButton::Left) {
             let delta = state_ref.dragging(cursor_pos);
             let scale = cam_mut.scale;
             cam_mut.translation += delta.extend(0.) * scale;
