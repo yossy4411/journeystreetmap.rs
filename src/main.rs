@@ -1,6 +1,6 @@
 mod map;
 
-use crate::map::{load_images, JourneyMapViewerState};
+use crate::map::{load_images, EditingMode, EditingType, JourneyMapViewerState};
 use bevy::app::App;
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
@@ -85,10 +85,25 @@ fn ui_system(
     // mut camera: Single<&mut Camera>,
     mut contexts: EguiContexts,
     mut ui_state: ResMut<MyApp>,
+    mut state: ResMut<JourneyMapViewerState>,
 ) {
     let ctx = contexts.ctx_mut();
     bevy_egui::egui::Window::new("Editor").show(ctx, |ui| {
         ui.label("Hello, world!");
+        let mode_str = match state.as_ref().editing_mode() {
+            EditingMode::Delete => "削除",
+            EditingMode::Insert => "挿入",
+            EditingMode::Select => "選択",
+            EditingMode::View => "閲覧",
+        };
+        let type_str = match state.as_ref().editing_type() {
+            EditingType::Fill => "塗りつぶし (建物ポリゴン)",
+            EditingType::Stroke => "線引き (道路など)",
+            EditingType::Poi => "POI (マーカー)",
+        };
+        
+        ui.label(format!("モード: {}", mode_str));
+        ui.label(format!("編集の種別: {}", type_str));
         if ui.button("Click me!").clicked() {
             println!("Button clicked!");
         }
@@ -160,6 +175,34 @@ fn camera_handling(
             let scale = cam_mut.scale;
             cam_mut.scale *= delta;
             cam_mut.translation += (mouse_pos_rel * (delta - 1.0)).extend(0.) * scale;
+        }
+    }
+}
+
+fn editor_handling (
+    mut keys: EventReader<KeyboardInput>,
+    mut state: ResMut<JourneyMapViewerState>,
+) {
+    for event in keys.read() {
+        match event.key_code {
+            KeyCode::KeyE => {
+                state.as_mut().toggle_editing_type();
+            }
+            KeyCode::KeyI => {
+                state.as_mut().set_editing_mode(EditingMode::Insert);
+            }
+            KeyCode::KeyD => {
+                state.as_mut().set_editing_mode(EditingMode::Delete);
+            }
+            KeyCode::KeyS => {
+                state.as_mut().set_editing_mode(EditingMode::Select);
+            }
+            KeyCode::KeyV => {
+                state.as_mut().set_editing_mode(EditingMode::View);
+            }
+            _ => {
+                
+            }
         }
     }
 }
