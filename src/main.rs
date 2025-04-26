@@ -9,6 +9,7 @@ use bevy_egui::egui::{FontData, FontDefinitions, FontFamily};
 use bevy_egui::{EguiContextPass, EguiContexts, EguiPlugin};
 use std::sync::Arc;
 use std::sync::Mutex;
+use bevy::input::keyboard::KeyboardInput;
 use bevy::input::mouse::MouseWheel;
 
 #[derive(Debug, Clone, Default, Resource)]
@@ -63,7 +64,10 @@ fn main() {
         )
         .add_systems(
             Update,
-            update,
+            (
+                reading_image,
+                camera_handling,
+            )
         )
         .add_systems(EguiContextPass, ui_system)
         .run();
@@ -102,15 +106,10 @@ fn setup(
     commands.spawn(Camera2d);
 }
 
-fn update(
+fn reading_image (
     mut commands: Commands,
     myapp: Res<MyApp>,
-    mut camera: Single<&mut Transform, With<Camera2d>>,
     mut assets: ResMut<Assets<Image>>,
-    mut windows: Query<&mut Window>,
-    mouse_button: Res<ButtonInput<MouseButton>>,
-    mut mouse_wheel: EventReader<MouseWheel>,
-    mut state: ResMut<JourneyMapViewerState>,
 ) {
     // ImageをWorldに落とし込む操作
     for ((region_x, region_z), colors) in myapp.images.lock().as_mut().unwrap().drain(..) {
@@ -123,6 +122,15 @@ fn update(
         ));
         println!("Loaded region: ({}, {})", region_x, region_z);
     }
+}
+
+fn camera_handling(
+    mut state: ResMut<JourneyMapViewerState>,
+    mut camera: Single<&mut Transform, With<Camera2d>>,
+    mut windows: Query<&mut Window>,
+    mouse_button: Res<ButtonInput<MouseButton>>,
+    mut mouse_wheel: EventReader<MouseWheel>,
+) {
     let state_ref = state.as_mut();
     if mouse_button.just_pressed(MouseButton::Left) {
         let window = windows.single_mut().unwrap();
@@ -154,5 +162,4 @@ fn update(
             cam_mut.translation += (mouse_pos_rel * (delta - 1.0)).extend(0.) * scale;
         }
     }
-
 }
