@@ -160,6 +160,11 @@ impl JourneyMapViewerState {
         d.x = -d.x;  // xを反転する
         d
     }
+    
+    /// ズームの変更
+    pub fn zoom(&mut self, delta: f32) -> f32 {
+        self.mouse_handling.zoom_factor.powf(-delta)
+    }
 
     pub fn editing_type(&self) -> EditingType {
         self.editing_type

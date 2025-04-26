@@ -10,6 +10,7 @@ use bevy_egui::egui::{FontData, FontDefinitions, FontFamily};
 use bevy_egui::{EguiContextPass, EguiContexts, EguiPlugin};
 use std::sync::Arc;
 use std::sync::Mutex;
+use bevy::input::mouse::MouseWheel;
 use bevy::tasks::futures_lite::StreamExt;
 
 #[derive(Debug, Clone, Default, Resource)]
@@ -110,6 +111,7 @@ fn update(
     mut assets: ResMut<Assets<Image>>,
     mut windows: Query<&mut Window>,
     mouse_button: Res<ButtonInput<MouseButton>>,
+    mut mouse_wheel: EventReader<MouseWheel>,
     mut state: ResMut<JourneyMapViewerState>,
 ) {
     // ImageをWorldに落とし込む操作
@@ -131,14 +133,28 @@ fn update(
         };
         println!("Left mouse button clicked!");
     }
-
+    let cam_mut = camera.as_mut();
     if mouse_button.pressed(MouseButton::Left) {
         let window = windows.single_mut().unwrap();
         if let Some(cursor_pos) = window.cursor_position() {
             let delta = state_ref.dragging(cursor_pos);
-            camera.as_mut().translation += delta.extend(0.);
+            let scale = cam_mut.scale;
+            cam_mut.translation += delta.extend(0.) * scale;
         }
     }
 
+    for event in mouse_wheel.read() {
+        let y = event.y;
+        let delta = state_ref.zoom(y);
+        let window = windows.single().unwrap();
+        let center = window.size() / 2.0;
+        if let Some(cursor_pos) = window.cursor_position() {
+            let mut mouse_pos_rel = cursor_pos - center;
+            mouse_pos_rel.x = -mouse_pos_rel.x;
+            let scale = camera.as_ref().scale;
+            camera.as_mut().scale *= delta;
+            camera.as_mut().translation += (mouse_pos_rel * (delta - 1.0)).extend(0.) * scale;
+        }
+    }
 
 }
