@@ -48,7 +48,7 @@ fn main() {
             bevy::scene::ScenePlugin,
             bevy::winit::WinitPlugin::<bevy::winit::WakeUp>::default(),
             bevy::render::RenderPlugin::default(),
-            bevy::render::texture::ImagePlugin::default(),
+            bevy::render::texture::ImagePlugin::default_nearest(),
         ))
         .add_plugins((
             bevy::render::pipelined_rendering::PipelinedRenderingPlugin,
