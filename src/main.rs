@@ -143,6 +143,7 @@ fn camera_handling(
     mut state: ResMut<JourneyMapViewerState>,
     mut camera: Single<&mut Transform, With<Camera2d>>,
     mut windows: Query<&mut Window>,
+    mut keys: EventReader<KeyboardInput>,
     mouse_button: Res<ButtonInput<MouseButton>>,
     mut mouse_wheel: EventReader<MouseWheel>,
 ) {
@@ -155,14 +156,7 @@ fn camera_handling(
         println!("Left mouse button clicked!");
     }
     let cam_mut = camera.as_mut();
-    if mouse_button.pressed(MouseButton::Left) {
-        let window = windows.single().unwrap();
-        if let Some(cursor_pos) = window.cursor_position() {
-            let delta = state_ref.dragging(cursor_pos);
-            let scale = cam_mut.scale;
-            cam_mut.translation += delta.extend(0.) * scale;
-        }
-    }
+
 
     for event in mouse_wheel.read() {
         let y = event.y;
@@ -177,32 +171,50 @@ fn camera_handling(
             cam_mut.translation += (mouse_pos_rel * (delta - 1.0)).extend(0.) * scale;
         }
     }
-}
 
-fn editor_handling (
-    mut keys: EventReader<KeyboardInput>,
-    mut state: ResMut<JourneyMapViewerState>,
-) {
+    let mut shifted = false;
     for event in keys.read() {
         match event.key_code {
             KeyCode::KeyE => {
-                state.as_mut().toggle_editing_type();
+                state_ref.toggle_editing_type();
             }
             KeyCode::KeyI => {
-                state.as_mut().set_editing_mode(EditingMode::Insert);
+                state_ref.set_editing_mode(EditingMode::Insert);
             }
             KeyCode::KeyD => {
-                state.as_mut().set_editing_mode(EditingMode::Delete);
+                state_ref.set_editing_mode(EditingMode::Delete);
             }
             KeyCode::KeyS => {
-                state.as_mut().set_editing_mode(EditingMode::Select);
+                state_ref.set_editing_mode(EditingMode::Select);
             }
             KeyCode::KeyV => {
-                state.as_mut().set_editing_mode(EditingMode::View);
+                state_ref.set_editing_mode(EditingMode::View);
             }
             _ => {
-                
+
             }
+        }
+        if event.key_code == KeyCode::ShiftLeft || event.key_code == KeyCode::ShiftRight {
+            shifted = true;
+        }
+    }
+
+    if shifted {
+        if mouse_button.just_pressed(MouseButton::Left) {
+            match state_ref.editing_mode() {
+                EditingMode::Insert => {
+                    // 何かしらのインサート処理をする
+                    println!("インサートするぜ！！");
+                }
+                _ => {}
+            }
+        }
+    } else if mouse_button.pressed(MouseButton::Left) {
+        let window = windows.single().unwrap();
+        if let Some(cursor_pos) = window.cursor_position() {
+            let delta = state_ref.dragging(cursor_pos);
+            let scale = cam_mut.scale;
+            cam_mut.translation += delta.extend(0.) * scale;
         }
     }
 }
