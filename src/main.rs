@@ -135,7 +135,7 @@ fn update(
     }
     let cam_mut = camera.as_mut();
     if mouse_button.pressed(MouseButton::Left) {
-        let window = windows.single_mut().unwrap();
+        let window = windows.single().unwrap();
         if let Some(cursor_pos) = window.cursor_position() {
             let delta = state_ref.dragging(cursor_pos);
             let scale = cam_mut.scale;
@@ -151,9 +151,9 @@ fn update(
         if let Some(cursor_pos) = window.cursor_position() {
             let mut mouse_pos_rel = cursor_pos - center;
             mouse_pos_rel.x = -mouse_pos_rel.x;
-            let scale = camera.as_ref().scale;
-            camera.as_mut().scale *= delta;
-            camera.as_mut().translation += (mouse_pos_rel * (delta - 1.0)).extend(0.) * scale;
+            let scale = cam_mut.scale;
+            cam_mut.scale *= delta;
+            cam_mut.translation += (mouse_pos_rel * (delta - 1.0)).extend(0.) * scale;
         }
     }
 
