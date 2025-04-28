@@ -8,6 +8,10 @@ serde = { version = "1.0.219", features = ["derive"] }
 tokio = { version = "1.44", default-features = false, features = ["fs", "rt", "rt-multi-thread", "sync", "macros"] }
 fastanvil = { git = "https://github.com/yossy4411/fastnbt-async.git", rev = "73323c1945e9fc1139eff9d0807821b7ba364d68", version = "0.31.0" }
 fastnbt = "2.5.0"
+env_logger = "0.11.8"
+log = "0.4.27"
+webp = "0.3"
+pmtiles2 = "0.3.1"
 
 [lib]
 name = "journeystreetmap"

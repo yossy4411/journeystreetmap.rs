@@ -1,20 +1,36 @@
+use std::env;
 use fastanvil::asyncio::Region;
+use pmtiles2::{Compression, TileType};
 use tokio::fs::File;
 use tokio::task::JoinSet;
 use journeystreetmap::journeymap::biome::RGB;
 use journeystreetmap::journeymap::{biome, JourneyMapReader};
+use journeystreetmap::log::Status;
+
+extern crate env_logger as logger;
+#[macro_use]
+extern crate log;
 
 #[tokio::main]
 async fn main() {
+    unsafe {
+        env::set_var("RUST_LOG", "debug");
+    }
+    logger::init();
+
+    info!("[1/4] JourneyMap Map Data to Bitmap (RAW) conversion");
+
     let mut reader = JourneyMapReader::new("/home/okayu/.local/share/ModrinthApp/profiles/Fabulously Optimized/journeymap/data/mp/160~251~235~246/");
+    info!("JourneyMapReader initialized");
+    info!("Start adding threads...");
     let region_offset_x = 0;
     let region_offset_z = 0;
-
-    let stopwatch = std::time::Instant::now();
 
     let mut threads = JoinSet::new();
     let regions = reader.get_regions_list().await;
     let mut images = Vec::new();
+
+    let mut status = Status::new("Add thread pool".to_string(), regions.len() as u32);
 
     for (region_x, region_z) in regions.into_iter() {
         let region = reader.try_read_region(region_offset_x + region_x, region_offset_z + region_z).await;
@@ -26,15 +42,39 @@ async fn main() {
             println!("Region not found");
             continue;
         }
+        status.update();
     }
+    status.finish();
+    info!("Start processing regions...");
 
+    let mut status = Status::new("Processing regions".to_string(), threads.len() as u32);
     while let Some(result) = threads.join_next().await {
         if let Ok(obj) = result {
             images.push(obj);  // 画像を保存
         }
+        status.update();
     }
-    println!("Time taken: {:?}", stopwatch.elapsed());
-    
+    status.finish();
+    info!("Finished processing regions.");
+    info!("Loaded {} regions", images.len());
+
+    info!("[2/4] Convert Bitmap (RAW) to WEBP");
+
+    let mut status = Status::new("Convert to WEBP".to_string(), images.len() as u32);
+
+    let mut webp_images = Vec::new();
+    for (pos, image) in images.iter() {
+        let encoder = webp::Encoder::from_rgba(image.as_slice(), 512, 512);
+        let webp_image = encoder.encode_lossless();
+        webp_images.push((pos, webp_image));
+        status.update();
+    }
+    status.finish();
+    info!("Finished converting WEBP images.");
+
+    info!("[3/4] Pack WEBP images into PMTiles");
+    let pt = pmtiles2::PMTiles::new(TileType::WebP, Compression::GZip);
+    // todo! implement this
 }
 
 async fn buffer_region(mut region: Region<File>, region_offset_x: i32, region_offset_z: i32, region_x: i32, region_z: i32) -> ((i32, i32), Box<[u8;512 * 512 * 4]>) {
